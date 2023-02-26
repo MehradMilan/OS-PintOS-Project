@@ -85,6 +85,25 @@ _start (int argc, char *argv[]) {
 ## به سوی crash
 
 ۶.
+Firstly we'll step into `process_execute()` function by running commands below in gdb:
+```bash
+  b run_task
+  c
+  n 3
+  step
+```
+Afterwards, by running the command below, will be able to identify which thread is running the `process_execute()` function:
+```bash
+info threads
+```
+The thread we're searching for is the thread with `main` ID.
+At the end we will run the `dumplist &all_list thread allelem` command and mention the output which is the set of all the threads present in PintOS at this time. (Containing their struct threds)
+```bash
+pintos-debug: dumplist #0: 0xc000e000 {tid = 1, status = THREAD_RUNNING, name = "main", '\000' <repeats 11 times>, stack = 0xc000edec <incomplete sequence \357>, priority = 31, allelem = {prev = 0xc0035910 <all_
+list>, next = 0xc0104020}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
+pintos-debug: dumplist #1: 0xc0104000 {tid = 2, status = THREAD_BLOCKED, name = "idle", '\000' <repeats 11 times>, stack = 0xc0104f34 "", priority = 0, allelem = {prev = 0xc000e020, next = 0xc0035918 <all_list+8
+>}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
+```
 
 ۷.
 
