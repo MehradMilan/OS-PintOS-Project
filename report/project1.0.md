@@ -160,7 +160,7 @@ process_execute (const char *file_name)
   return tid;
 }
 ```
-The calling function, `thread_create`, will create a new kernel thread running the user program. The code is shown below:
+Here, the calling function, `thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);`, will create a new kernel thread running the start_process function. The code is shown below:
 ```C
 tid_t
 thread_create (const char *name, int priority,
@@ -206,12 +206,120 @@ thread_create (const char *name, int priority,
 ```
 
 ۱۰.
+We continue debuging untill we reach the `load` function:
+```bash
+n 6
+```
+Afterwards, we print the `if_` struct (using command: `print/x if_`) to find `eip` and `esp` values:
+```
+{edi = 0x0, esi = 0x0, ebp = 0x0, esp_dummy = 0x0, ebx = 0x0, edx = 0x0, ecx = 0x0, eax = 0x0, gs = 0x23, fs = 0x23, es = 0x23 ds = 0x23, vec_no = 0x0, error_code = 0x0, frame_pointer = 0x0, eip = 0x8048754, cs = 0x1b, eflags = 0x202, esp = 0xc0000000, ss = 0x23}
+```
+So, values are:
+`eip = 0x8048754`, `esp = 0xc0000000`.
 
 ۱۱.
+Firstly, we continue debuging untill we reach executing `iret`:
+```bash
+n
+step
+n 6
+step
+```
+
 
 ۱۲.
+Using GDB commands, we reach `asm volatile` function and step into it. Then we continue to `iret` and print registers.
+```bash
+n
+step
+n 6
+step
+info registers
+```
+The output is:
+```
+eax            0x0      0
+ecx            0x0      0
+edx            0x0      0
+ebx            0x0      0
+esp            0xc0000000       0xc0000000
+ebp            0x0      0x0
+esi            0x0      0
+edi            0x0      0
+eip            0x8048754        0x8048754
+eflags         0x202    [ IF ]
+cs             0x1b     27
+ss             0x23     35
+ds             0x23     35
+es             0x23     35
+fs             0x23     35
+gs             0x23     35
+```
+As we expected, the output is similar to `if_` struct values. (It only doesn't contain `struct intr_frame`, `vec_no`, `error_code` which are discarded in `intr_exit`).
 
 ۱۳.
+The commands and their outputs are mentioned below:
+Command:
+```bash
+loadusersymbols tests/userprog/do-nothing
+```
+Output:
+```
+add symbol table from file "tests/userprog/do-nothing" at
+        .text_addr = 0x80480a0
+```
+Command:
+```bash
+bt
+```
+Output:
+```
+#0  _start (argc=<unavailable>, argv=<unavailable>) at ../../lib/user/entry.c:8
+```
+Command:
+```bash
+disassemble
+```
+Output:
+```
+Dump of assembler code for function _start:
+=> 0x08048754 <+0>:     sub    $0x1c,%esp
+   0x08048757 <+3>:     mov    0x24(%esp),%eax
+   0x0804875b <+7>:     mov    %eax,0x4(%esp)
+   0x0804875f <+11>:    mov    0x20(%esp),%eax
+   0x08048763 <+15>:    mov    %eax,(%esp)
+   0x08048766 <+18>:    call   0x80480a0 <main>
+   0x0804876b <+23>:    mov    %eax,(%esp)
+   0x0804876e <+26>:    call   0x804a2bc <exit>
+End of assembler dump.
+```
+Command:
+```bash
+stepi
+stepi
+```
+Output:
+```
+pintos-debug: a page fault exception occurred in user mode
+pintos-debug: hit 'c' to continue, or 's' to step to intr_handler
+0xc0021b95 in intr0e_stub ()
+```
+Command:
+```bash
+bt
+```
+Output:
+```
+#0  0xc0021b95 in intr0e_stub ()
+```
+Command:
+```bash:
+btpagefault
+```
+The wanted output:
+```
+#0  _start (argc=<unavailable>, argv=<unavailable>) at ../../lib/user/entry.c:9
+```
 
 
 ## دیباگ
