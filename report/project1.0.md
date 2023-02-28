@@ -7,11 +7,11 @@
 
 Mehrad Milanloo <mehrad_milanloo@yahoo.com>
 
-نام و نام خانوادگی <example@example.com> 
+Parnian Razavipour <razaviparnian81@yahoo.com>
 
-نام و نام خانوادگی <example@example.com> 
+Alireza Noroozi <noroozi.alirezaa@gmail.com> 
 
-نام و نام خانوادگی <example@example.com> 
+Hossein Alihosseini <alihosseini@sharif.edu> 
 
 مقدمات
 ----------
@@ -264,7 +264,7 @@ step
 n 6
 step
 ```
-
+The processor needs to enter the `User mode` to run the user program, but x86 processor doesn't support any straightforward solution to context switch. Therefore, `start_process` uses `asm volatile` to call the `intr_exit` function manually. Obviously there is no real interrupt from user mode but now we are in `intr_exit` function in `intr_stubs.S` file which handles the interrupt exit that leads to return from `Kernel mode` to `User mode`. (`iret` command sets the value of some global registers. especially `eip` register which plays the role of `Program Counter` in x86 processor. So by fetching the next instruction, we are back to `User mode` and ready to execute next instruction that is the first line of the user program.)
 
 ۱۲.
 Using GDB commands, we reach `asm volatile` function and step into it. Then we continue to `iret` and print registers.
@@ -364,13 +364,61 @@ The wanted output:
 ## دیباگ
 
 ۱۴.
+If you look at the `setup_stack` function which is called by `load` function which is also called by ``start_process` function, you can find this line of C code: (All of these functions are located in `process.c` file.)
+```C
+*esp = PHYS_BASE;
+```
+`setup_stack` creates a minimal stack by mapping a zeroed page at the top of user virtual memory. this line of code, sets the stack pointer right at the `PHYS_BASE`. As we discussed in Q5, When `_start` tries to access its arguments, it crosses the `PHYS_BASE` and causes `Page Fault`. So if we change the code as below, `do-nothing` test is going to be passed:
+```C
+*esp = PHYS_BASE - 0x0c;
+```
+(Note: 4 bytes for argc, 4 bytes for argv, and 4 byte for return address. Therefore we can't pass the `do-stack-align` test. If we consider the 16 byte stack alignment and change to code as below, both tests will pass.)
+Final Change:
+```C
+*esp = PHYS_BASE - 0x24;
+```
 
 ۱۵.
+The program should return `12`.
+According to the PintOS documents, the stack should be aligned 16 bytes. (Each block address should end with `0xc`.)
+Because we already set the value of `esp` register to `PHYS_BASE - 0x24`, the alignment condtion is established and `esp` always points to an address ending with `0xc`. (16n - 36 = 12 (mod 16))
 
 ۱۶.
+Running these GDB commands leads to the answer:
+```bash
+b _start
+c
+stepi 14
+disassemble
+x/2xw $esp
+```
+Output:
+```
+0xbfffff98:     0x00000001      0x000000a2
+```
 
 ۱۷.
+```
+(gdb) print args[0]
+$2 = 1 (=0x00000001)
+(gdb) print args[1]
+$3 = 162 (0x000000a2)
+```
+Values are same as the prevoius output which were the values on the top of the stack. `args[0]` is syscall code and `args[1]` is the value of `exit status`. (GDB is running `do-nothing` test.)
 
 ۱۸.
+A semaphore is a synchronization mechanism that allows multiple processes to access a shared resource. It is used to control access to the resource by allowing only one process at a time to access it. The semaphore consists of two operations: `sema_up` and `sema_down`. The purpose of the `temporary semaphore` is to provide a synchronization mechanism between processes. The sema_up and sema_down functions are used to signal and wait for a particular event to occur. The temporary semaphore allows processes to wait until a certain condition is met before continuing execution. This ensures that processes do not interfere with each other, as they must wait for the condition to be met before proceeding.
+The sema_up operation increases the value of the semaphore, allowing another process to access the shared resource. The sema_down operation decreases the value of the semaphore, preventing other processes from accessing the shared resource until the current process has finished using it. So obviously sema_up locates in `process_exit` and sema_down locates in `process_wait`.
+PintOS runs a user program by calling the `process_execute` function in `init.c` file and passes its return value which is a thread's id to `process_wait`. So that the kernel should wait untill the program ends. (Note: This only supports one user program running at time.)
 
 ۱۹.
+```bash
+b sema_down
+c
+dumplist &all_list thread allelem
+```
+The output shows all the threads (with struct) at the time. The `main` thread with located in the adress `0xc000e000` is currently running the program:
+```
+pintos-debug: dumplist #0: 0xc000e000 {tid = 1, status = THREAD_RUNNING, name = "main", '\000' <repeats 11 times>, stack = 0xc000eeac "\001", priority = 31, allelem = {prev = 0xc0035910 <all_list>, next = 0xc0104020}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
+pintos-debug: dumplist #1: 0xc0104000 {tid = 2, status = THREAD_BLOCKED, name = "idle", '\000' <repeats 11 times>, stack = 0xc0104f34 "", priority = 0, allelem = {prev = 0xc000e020, next = 0xc0035918 <all_list+8>}, elem = {prev = 0xc0035920 <ready_list>, next = 0xc0035928 <ready_list+8>}, pagedir = 0x0, magic = 3446325067}
+```
