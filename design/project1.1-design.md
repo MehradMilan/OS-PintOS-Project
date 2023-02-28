@@ -8,9 +8,9 @@
 
 محمدحسین علی‌حسینی alihosseini@sharif.edu 
 
-نام و نام خانوادگی <example@example.com> 
+مهراد میلانلو mehrad_milanloo@yahoo.com
 
-نام و نام خانوادگی <example@example.com> 
+پرنیان رضوی‌پور razaviparnian81@yahoo.com
 
 مقدمات
 ----------
