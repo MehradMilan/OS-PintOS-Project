@@ -91,6 +91,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       unsigned size = (unsigned) args[3];
       f->eax = sys_write(fd, buffer, size);
     }
+
+    if ( args[0] == SYS_PRACTICE)
+    {
+      f->eax = args[1] + 1;
+    }
     
   
 }
