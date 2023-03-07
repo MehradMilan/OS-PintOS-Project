@@ -4,17 +4,12 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/vaddr.h"
 
 #define MAX_SYSCALL_ARGUMENTS     10
-
-#define CHECK_ARGS(args, count, ...) if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
-
-#define EXIT_WITH_ERROR { printf ("%s: exit(%d)\n", &thread_current ()->name, -1); thread_exit (); return; }
 
 static void syscall_handler (struct intr_frame *);
 
@@ -24,48 +19,37 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static bool
-is_user_mapped_memory(const void *address)
+void
+sys_exit (int status)
 {
-  if (is_user_vaddr(address))
-    return (pagedir_get_page(thread_current ()->pagedir, address) != NULL);
-  return false;
+  struct thread *cur = thread_current ();
+  printf ("%s: exit(%d)\n", (char *) &cur->name, status);
+  thread_exit ();
 }
 
-/* Checks if arguments for a system call are valid. It
- * first checks that ARRAY has ARG_COUNT members in user memory
- * (it doesn't check for only stack) and then for every argument,
- * it checks that if it's an address, it is in user space.
- *
- * The function call check_arguments(arr, 3, true, false, true)
- * checks for a system call which has 3 arguments which first and
- * last one of them is an address.
- */
-static bool
-check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
+static int
+validate_addr (void *addr)
 {
-  if (arg_count > MAX_SYSCALL_ARGUMENTS)
-    return false;
-
-  if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
-    return false;
-
-  if (is_address && !is_user_mapped_memory((void *) array[1]))
-    return false;
-
-  va_list args;
-  va_start(args, is_address);
-  for (size_t i = 2; i <= arg_count; i ++) {
-    bool should_check_address = va_arg (args, int);
-    if (should_check_address && !is_user_mapped_memory((void *)array[i]))
-      return false;
-  }
-  va_end(args);
-
-  return true;
+  if (!addr || !is_user_vaddr (addr)
+      || !pagedir_get_page (thread_current ()->pagedir, addr))
+    {
+      sys_exit (-1);
+    }
+  return 1;
 }
 
+static void
+validate_args (void *esp, int argc)
+{
+  if (argc > MAX_SYSCALL_ARGUMENTS)
+    return false;
+  // validate_addr (esp + (argc + 1) * sizeof (void *) - 1);
+  void *addr = esp + (argc + 1) * sizeof (void *) - 1;
+  if (!addr || !is_user_vaddr (addr) || !pagedir_get_page (thread_current()->pagedir, addr))
+    sys_exit (-1);
 
+return 1;
+}
 
 struct file* get_file_by_fd(int fd) {
   struct list *fd_list = &thread_current ()->fd_list;
@@ -112,8 +96,6 @@ sys_write (int fd_num, const void *buffer, unsigned size)
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-  if (!is_kernel_vaddr(f) || !is_kernel_vaddr((void *)(f + 1) - 1))
-    EXIT_WITH_ERROR;
   uint32_t* args = ((uint32_t*) f->esp);
 
   /*
@@ -125,7 +107,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   /* printf("System call number: %d\n", args[0]); */
 
-  CHECK_ARGS(args, 0, false);
+  // CHECK_ARGS(args, 0, false);
 
   if (args[0] == SYS_EXIT)
     {
@@ -145,12 +127,20 @@ syscall_handler (struct intr_frame *f UNUSED)
   
   if ( args[0] == SYS_CREATE)
     {
-      CHECK_ARGS(args, 2, true, false);
+      validate_args (f->esp, 1);
       f->eax = filesys_create((const char *) args[1], args[2]);
     }
+  if (args[0] == SYS_REMOVE) {
+    validate_args (f->esp, 1);
+    f->eax = filesys_remove(args[1]);
+  }
+  if (args[0] == SYS_OPEN) {
+    validate_args (f->esp, 1);
+    f->eax = filesys_open(args[1]);
+  }
   if ( args[0] == SYS_PRACTICE)
     {
-      CHECK_ARGS(args, 1, false);
+      validate_args (f->esp, 1);
       f->eax = args[1] + 1;
     }
   
