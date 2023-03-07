@@ -12,19 +12,11 @@
 
 #define MAX_SYSCALL_ARGUMENTS     10
 
+#define CHECK_ARGS(args, count, ...) if (!check_arguments((args), (count), __VA_ARGS__)) EXIT_WITH_ERROR
 
-#define CHECK_ARGS(args, count, is_address...) \
-if (!check_arguments(args, count, is_address)) EXIT_WITH_ERROR
-
-#define EXIT_WITH_ERROR \
-{ \
-  printf ("%s: exit(%d)\n", &thread_current ()->name, -1); \
-  thread_exit (); \
-  return; \
-}
+#define EXIT_WITH_ERROR { printf ("%s: exit(%d)\n", &thread_current ()->name, -1); thread_exit (); return; }
 
 static void syscall_handler (struct intr_frame *);
-
 
 void
 syscall_init (void)
@@ -50,8 +42,7 @@ is_user_mapped_memory(const void *address)
  * last one of them is an address.
  */
 static bool
-check_arguments(uint32_t* array, uint32_t arg_count, bool is_address, ... /* address argument
- * indices */)
+check_arguments(uint32_t* array, uint32_t arg_count, uint32_t is_address, ...)
 {
   if (arg_count > MAX_SYSCALL_ARGUMENTS)
     return false;
@@ -59,13 +50,14 @@ check_arguments(uint32_t* array, uint32_t arg_count, bool is_address, ... /* add
   if (!is_user_mapped_memory(array) || !is_user_mapped_memory((void *)(array + arg_count + 1) - 1))
     return false;
 
-  if (is_address && !is_user_mapped_memory(array[1]))
+  if (is_address && !is_user_mapped_memory((void *) array[1]))
     return false;
 
   va_list args;
-  va_start(args, arg_count);
+  va_start(args, is_address);
   for (size_t i = 2; i <= arg_count; i ++) {
-    if (va_arg(args, bool) && !is_user_mapped_memory(array[i]))
+    bool should_check_address = va_arg (args, int);
+    if (should_check_address && !is_user_mapped_memory((void *)array[i]))
       return false;
   }
   va_end(args);
@@ -153,7 +145,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   
   if ( args[0] == SYS_CREATE)
     {
-      printf("create args: %d %s %d\n", args[0], (const char *) args[1], args[2]);
+      CHECK_ARGS(args, 2, true, false);
+      f->eax = filesys_create((const char *) args[1], args[2]);
     }
   if ( args[0] == SYS_PRACTICE)
     {
