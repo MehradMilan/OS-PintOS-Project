@@ -485,16 +485,18 @@ static bool
 fill_args_in_stack (void **esp)
 {
   /* Put arguments on stack and update argv accordingly. */
-  for (int i = argc - 1; i >= 0; i--)
+//  printf("###############  filling in...  ###############\n");
+//  printf("argc: %d\n", argc);
+  for (int i = 0; i < argc; i ++)
     {
-      const size_t len = strlen(argv[i]) + 1;
-
+//      printf("argv[%d]: %s\n", i, argv[i]);
+      const size_t len = strnlen(argv[i], MAX_ARGUMENT_LENGTH) + 1;
+      *esp -= len;
       if (len > MAX_ARGUMENT_LENGTH)
         return false;
-      *esp -= len;
 
       memcpy (*esp, argv[i], len);
-      addrs[i] = *esp;
+      argv[i] = *esp;
     }
 
   /* Align stack. */
@@ -502,23 +504,22 @@ fill_args_in_stack (void **esp)
   *esp -= align_size;
   memset (*esp, 0, align_size);
 
-  /* Put argv. */
-  long int size = sizeof(addrs[0]) * (argc + 1);
-  *esp -= size;
-  memset(*esp, &addrs[0], size);
-
-  /* Put argv address */
+  /* Put argv[argc]. */
   *esp -= 4;
-  memcpy(*esp, esp, 4);
+  memset(*esp, 0, 4);
+
+  /* Put argv. */
+  *esp -= argc * 4;
+  memcpy(*esp, argv, argc * 4);
+  *esp -= 4;
+  *((size_t*)*esp) = (size_t)(*esp + 4);
 
   /* Put argc. */
   *esp -= 4;
-  memcpy(*esp, &argc * 4);
+  *((size_t*)*esp) = argc;
 
   /* Put return address. */
   *esp -= 4;
-  memset (*esp, 0, 4);
-
 //  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
   return true;
 }
