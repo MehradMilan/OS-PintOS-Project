@@ -500,7 +500,7 @@ fill_args_in_stack (void **esp)
     }
 
   /* Align stack. */
-  const int align_size = ((size_t) *esp) % 4 + ((argc + 3) % 4) * 4;
+  const int align_size = ((size_t) *esp) % 4;
   *esp -= align_size;
   memset (*esp, 0, align_size);
 
@@ -516,11 +516,12 @@ fill_args_in_stack (void **esp)
 
   /* Put argc. */
   *esp -= 4;
+//  memset(*esp, &argc, 4);
   *((size_t*)*esp) = argc;
 
   /* Put return address. */
   *esp -= 4;
-//  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
+  memset(*esp, 0, 4);
   return true;
 }
 
