@@ -138,11 +138,13 @@ syscall_handler (struct intr_frame *f UNUSED)
     validate_args (f->esp, 1);
     f->eax = filesys_open(args[1]);
   }
-  if ( args[0] == SYS_PRACTICE)
-    {
-      validate_args (f->esp, 1);
-      f->eax = args[1] + 1;
-    }
+  if (args[0] == SYS_PRACTICE){
+    validate_args (f->esp, 1);
+    f->eax = args[1] + 1;
+  }
+  if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+  }
   
 }
 

@@ -24,6 +24,7 @@
 #define ARGUMENT_DELIMITER   " "
 
 static char* argv[MAX_ARGUMENTS];
+static char* addrs[MAX_ARGUMENTS];
 static int argc;
 static bool tokenize(char* cmd_line);
 
@@ -31,29 +32,27 @@ static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
 
-/* Tokenizes the cmd_line provided as the input, and sets argc and
- * argv variables accordingly, returns true on sucess, and false
- * otherwise. */
+/* Tokenizes the input and sets argc and argv variables accordingly.
+ * returns true on sucess, and false otherwise. */
 bool
 tokenize(char* cmd_line)
 {
-  int i;
   char *c;
 
-  for (i = 0; i < MAX_ARGUMENTS; ++ i)
-    argv[i] = NULL;  /* empty argv */
-
+  /* Initialize argv and argc */
+  for (argc = 0; argc < MAX_ARGUMENTS; ++ argc)
+    argv[argc] = NULL;  /* empty argv */
   argc = 0;
+
+  /* Tokenizing the input */
   char* strtok_saveptr;
-  c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr);  /* Start tokenizer on the input */
-  for (i = 0; c && (i < MAX_ARGUMENTS); ++ i)
-    {
-      argv[i] = c;
+  for (c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr)) {
+      argv[argc] = c;
+      // addrs[argc] = &argv[argc];
       argc ++;
-      c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr);  /* scan for next token */
     }
 
-  /* Return false if we ran out of space on argv. */
+  /* Return false if argv is left. */
   if (strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
     return false;
 
@@ -486,41 +485,39 @@ static bool
 fill_args_in_stack (void **esp)
 {
   /* Put arguments on stack and update argv accordingly. */
-//  printf("###############  filling in...  ###############\n");
-//  printf("argc: %d\n", argc);
-  for (int i = 0; i < argc; i ++)
+  for (int i = argc - 1; i >= 0; i--)
     {
-//      printf("argv[%d]: %s\n", i, argv[i]);
       const size_t len = strnlen(argv[i], MAX_ARGUMENT_LENGTH) + 1;
-      *esp -= len;
+
       if (len > MAX_ARGUMENT_LENGTH)
         return false;
+      *esp -= len;
 
       memcpy (*esp, argv[i], len);
-      argv[i] = *esp;
+      addrs[i] = *esp;
     }
 
   /* Align stack. */
-  const int align_size = ((size_t) *esp) % 4 + ((argc + 3) % 4) * 4;
+  const int align_size = ((long) *esp) % 4;
   *esp -= align_size;
   memset (*esp, 0, align_size);
 
-  /* Put argv[argc]. */
-  *esp -= 4;
-  memset(*esp, 0, 4);
-
   /* Put argv. */
-  *esp -= argc * 4;
-  memcpy(*esp, argv, argc * 4);
+  long int size = sizeof(addrs[0]) * (argc + 1);
+  *esp -= size;
+  memset(*esp, &addrs[0], size);
+
+  /* Put argv address */
   *esp -= 4;
-  *((size_t*)*esp) = (size_t)(*esp + 4);
+  memcpy(*esp, esp, 4);
 
   /* Put argc. */
   *esp -= 4;
-  *((size_t*)*esp) = argc;
+  memcpy(*esp, &argc, 4);
 
   /* Put return address. */
   *esp -= 4;
+  memset (*esp, 0, 4);
 //  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
   return true;
 }
