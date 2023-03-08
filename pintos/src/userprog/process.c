@@ -494,30 +494,31 @@ fill_args_in_stack (void **esp)
       *esp -= len;
 
       memcpy (*esp, argv[i], len);
-      addrs[i] = *esp;
+      argv[i] = *esp;
     }
 
   /* Align stack. */
-  const int align_size = ((long) *esp) % 4;
+  const int align_size = ((size_t) *esp) % 4 + ((argc + 3) % 4) * 4;
   *esp -= align_size;
   memset (*esp, 0, align_size);
 
   /* Put argv. */
-  long int size = sizeof(addrs[0]) * (argc + 1);
-  *esp -= size;
-  memset(*esp, &addrs[0], size);
+  // long int size = sizeof(addrs[0]) * (argc + 1);
+  // *esp -= size;
+  // memset(*esp, &addrs[0], size);
 
   /* Put argv address */
   *esp -= 4;
-  memcpy(*esp, esp, 4);
+  memcpy(*esp, 0, 4);
 
   /* Put argc. */
-  *esp -= 4;
-  memcpy(*esp, &argc, 4);
+  *esp -= argc * 4;
+  memcpy(*esp, argv, argc * 4);
 
   /* Put return address. */
+  *((size_t*)*esp) = argc;
   *esp -= 4;
-  memset (*esp, 0, 4);
+
 //  hex_dump(*esp, *esp, (void*)0xc0000000 - *esp, true);
   return true;
 }
