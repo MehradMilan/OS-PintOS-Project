@@ -132,11 +132,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    struct wait_status wait_status_entry;
-    struct wait_status *wait_status;    
-    struct list children;               
-    bool load_success;                  
-    struct semaphore child_load_sema; /* Semaphore to make sure child has finished loading */
+    // struct wait_status wait_status_entry;
+    // struct wait_status *wait_status;    
+    // struct list children;               
+    // bool load_success;                  
+    // struct semaphore child_load_sema; /* Semaphore to make sure child has finished loading */
   };
 
 /* If false (default), use round-robin scheduler.
