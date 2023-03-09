@@ -28,7 +28,7 @@ syscall_init (void)
 }
 
 void
-sys_exit ( int status )
+sys_exit (int status)
 {
   struct thread *cur = thread_current();
   printf ("%s: exit(%d)\n", (char *) &cur->name, status);
@@ -190,7 +190,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     thread_exit();
   } else if (args[0] == SYS_WRITE) {
     validate_args (f->esp, 3);
-    validate_addr(args[2]);
+    validate_addr (args[2]);
     f->eax = sys_write(args[1], (const void*) args[2], (unsigned) args[3]);
   } else if (args[0] == SYS_CREATE) {
     validate_args (f->esp, 2);
@@ -207,7 +207,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = args[1] + 1;
   } else if (args[0] == SYS_CLOSE) {
      validate_args (f->esp, 1);
-    //  sys_close((int)args[1]);     
   } else if (args[0] == SYS_FILESIZE) {
     validate_args (f->esp, 1);
     if (args[1] < 2) {
