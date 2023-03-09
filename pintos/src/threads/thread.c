@@ -465,7 +465,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  thread_init(t);
+  init_thread_(t);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -589,7 +589,7 @@ allocate_tid (void)
 }
 
 /* init function for wait_status struct. */
-void thread_init (struct thread *t){
+void init_thread_ (struct thread *t){
   t->exit_code = -1;
   t->wait_st = NULL;
   list_init (&t->children);
