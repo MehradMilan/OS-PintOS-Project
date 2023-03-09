@@ -9,6 +9,8 @@
 #include "filesys/inode.h"
 #include "threads/vaddr.h"
 #include <string.h>
+#include "userprog/process.h"
+#include "devices/shutdown.h"
 
 #define MAX_SYSCALL_ARGUMENTS 10
 #define MAX_NAME_SIZE 14
@@ -210,12 +212,17 @@ syscall_handler (struct intr_frame *f UNUSED)
     struct file *file = get_file_by_fd(args[1]);
     if (file == NULL) {
       f->eax = -1;
-    	sys_exit( -1); 
+    	sys_exit(-1); 
   	}
     else if (args[1] >= 2 ) 
     file_seek(file, (off_t) args[2]);
   }
   else if (args[0] == SYS_HALT) {
-       shutdown_power_off(); }
+    shutdown_power_off(); 
+  } else if (args[0] == SYS_EXEC) {
+    f->eax = process_execute((char *)args[1]);
+  } else if (args[0] == SYS_WAIT) {
+  	f->eax = process_wait(args[1]);
+	}
 
 }
