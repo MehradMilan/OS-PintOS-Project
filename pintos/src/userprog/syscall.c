@@ -121,23 +121,21 @@ sys_write (int fd_num, const void *buffer, unsigned size)
   if (fd_num <= STDIN_FILENO || !fd_num || fd_num > thread_current()->fd_count) {
     sys_exit(-1);
   }
-  // for (int i = 0; validate_addr(buffer + i) && i < size ; ++i);
-  // int bytes_written = 0;
+  for (int i = 0; validate_addr(buffer + i) && i < size ; ++i);
+  int bytes_written = 0;
   if (fd_num == STDOUT_FILENO)
   {
     putbuf (buffer, size);
-    return size;
-    // bytes_written = size;
+    bytes_written = size;
   } else {
     struct file *f = get_file_by_fd(fd_num); 
     if (!f){
       sys_exit(-1);
     }
-    // return file_write (f , buffer, size);
     struct inode *inode = file_get_inode(f);
-    if (!inode) return file_write (f , buffer, size);
-        
+    if (!inode) bytes_written = file_write (f, buffer, size);
   }
+  return bytes_written;
 }
 
 int
