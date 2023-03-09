@@ -108,7 +108,7 @@ process_execute (const char *file_name)
     palloc_free_page(fn_copy);
     return TID_ERROR;
   }
-  list_push_back(&thread_current()->children, &cArgs.wait_status->elem);
+  list_push_back(&thread_current()->ws_children, &cArgs.wait_status->elem);
 
   return tid;
 }
@@ -149,7 +149,7 @@ start_process (struct cArgs *cArgs)
       cArgs->wait_status->exit_code = -1;
       sema_init(&(cArgs->wait_status->dead), 0);
       lock_init(&(cArgs->wait_status->lock));
-      list_push_back(&thread_current->children, &cArgs->wait_status->elem);
+      list_push_back(&thread_current->ws_children, &cArgs->wait_status->elem);
     }
   
     cArgs->success = success && cArgs->wait_status != NULL;
@@ -187,10 +187,9 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
-  struct list all_list = cur->children;
+  struct list all_list = cur->ws_children;
   int find_waited_thread = 0;
   for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
-    struct thread *t = list_entry (e, struct thread, allelem);
     if (t->tid == child_tid) {
       find_waited_thread = 1;
       break;
