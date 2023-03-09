@@ -134,18 +134,18 @@ start_process (struct cArgs *cArgs)
     /* add child's wait_status to children list */
     // list_push_back(&parent->children, &(t->wait_status)->elem);
   } else {
-    thread_current()->wait_st = malloc(sizeof(*exec_inf->wait_status));
+    thread_current()->wait_status = malloc(sizeof(*cArgs->wait_status));
     cArgs->wait_status = thread_current()->wait_st;
 
     if (cArgs->wait_status != NULL){
-      cArgs->wait_status->ref_count = 2;
-      cArgs->wait_status->child_tid = thread_current()->tid;
-      sema_init (&(cArgs->wait_status->sema), 0);
-      lock_init (&(cArgs->wait_status->lock));
+      cArgs->wait_status->ref_cnt = 2;
+      cArgs->wait_status->tid = thread_current()->tid;
+      sema_init(&(cArgs->wait_status->dead), 0);
+      lock_init(&(cArgs->wait_status->lock));
     }
   
     cArgs->success = success && cArgs->wait_status != NULL;
-    sema_up(&cArgs->child_load_sema);
+    sema_up(&cArgs->load_sema);
 
     /* If load failed, quit. */
     palloc_free_page (file_name);
