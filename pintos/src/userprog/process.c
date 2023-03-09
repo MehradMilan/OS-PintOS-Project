@@ -19,6 +19,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 #define MAX_ARGUMENTS        32
 #define MAX_ARGUMENT_LENGTH  1024
@@ -60,10 +61,8 @@ tokenize(char* cmd_line)
   return true;
 }
 
-struct cArgs {
-  void *file_name;
-  struct semaphore load_sema;
-  struct wait_status *wait_status;
+struct argStruct {
+  char *file_name;
   struct thread *parent;
   bool success;
 }
@@ -174,6 +173,18 @@ start_process (struct cArgs *cArgs)
   NOT_REACHED ();
 }
 
+void wait_status_helper(struct wait_status *ws) {
+  lock_acquire(&ws->lock);
+  ws->ref_cnt -= 1;
+  if (ws->ref_cnt == 0) {
+    lock_release(&ws->lock);
+    list_remove(&ws->elem);
+    // free(ws);
+  } else {
+    lock_release(&ws->lock);
+  }
+}
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -186,30 +197,23 @@ start_process (struct cArgs *cArgs)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-	int exit_code = -1;
-	struct wait_status *child_wait_st = try_get_wait_st(child_tid);
-	if (child_wait_st == NULL) {
-		return exit_code;
-	}
-	sema_down(&child_wait_st->sema);
-	list_remove(&child_wait_st->elem);
-	exit_code = child_wait_st->exit_code;
-	return exit_code;
-}
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  struct list all_list = cur->ws_children;
+  int find_waited_thread = 0;
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+    if (t->tid == child_tid) {
+      find_waited_thread = 1;
+      break;
+    }
+  }
 
-struct wait_status*
-try_get_wait_st(tid_t child_tid) {
-	struct thread *cur_thread = thread_current();
-	struct list_elem *cur_child = list_begin(&cur_thread->children);
-	struct list_elem *last_child = list_end(&cur_thread->children);
-	while (cur_child != last_child) {
-		struct wait_status *child_wait_st = list_entry(cur_child, struct wait_status, elem);
-		cur_child = list_next(cur_child);
-		if (child_wait_st->child_tid == child_tid) {
-			return child_wait_st;
-		}
-	}
-	return NULL;
+  if (!find_waited_thread) {
+    return -1;
+  }
+
+  sema_down (&temporary);
+  return 0;
 }
 
 /* Free the current process's resources. */
@@ -218,6 +222,11 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  struct wait_status *cur_ws = cur->wait_status;
+  wait_status_helper(cur_ws);
+
+  struct list_elem *e;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -235,19 +244,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-	  /* Set exit code and up wait_status sema */
-    if (cur->wait_st != NULL) {
-      //cur->wait_st->exit_code = cur->exit_code;
-      printf("%s: exit(%d)\n", &cur->name, cur->wait_st->exit_code);
-      int ref_count;
-      lock_acquire (&cur->wait_st->lock);
-      cur->wait_st->ref_cnt -= 1;
-      ref_count = cur->wait_st->ref_cnt;
-      lock_release (&cur->wait_st->lock);
-      /*if (ref_count == 0) {
-        free(cur->wait_st);
-      }*/
-    }
+  sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current
