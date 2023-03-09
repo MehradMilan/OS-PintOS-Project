@@ -59,11 +59,12 @@ tokenize(char* cmd_line)
   return true;
 }
 
-struct argStruct {
-  void *file_name_;
-  struct thread *parent;
-};
-
+struct cArgs {
+  void *file_name;
+  struct semaphore load_sema;
+  struct wait_status *wait_status;
+  bool success;
+}
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -83,34 +84,39 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  struct thread *t = thread_current ();
-  struct argStruct args;
-  args.file_name_ = fn_copy;
-  args.parent = t;
+  struct thread *t = thread_current();
+  struct cArgs cArgs;
+  cArgs.file_name = fn_copy;
+  sema_init(&cArgs.load_sema, 0);
+  
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, &args);
-  if (tid == TID_ERROR)
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, &cArgs);
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy);
-  
-  sema_down(&t->child_load_sema);
-  if (t->load_success) {
-    return tid;
-  } else {
-    return -1;
+    return TID_ERROR;
   }
+
+  sema_down(&(cArgs.load_same));
+  if (!cArgs.success){
+    palloc_free_page(fn_copy);
+    return TID_ERROR;
+  }
+  list_push_back(&thread_current()->children, &cArgs.wait_status->elem);
+
+  return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (struct argStruct *args)
+start_process (struct cArgs *cArgs)
 {
-  void *file_name_ = args->file_name_;
-  struct thread *parent = args->parent;
-  struct thread *t = thread_current ();
+  void *file_name = cArgs->file_name;
+  // struct thread *parent = args->parent;
+  // struct thread *t = thread_current ();
 
-  char *file_name = file_name_;
+  // char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
@@ -122,16 +128,28 @@ start_process (struct argStruct *args)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* set load status */
-  parent->load_success = success;
-  if (success) {
+  if (!success) {
+    palloc_free_page(file_name);
+    thread_exit ();
     /* add child's wait_status to children list */
-    list_push_back(&parent->children, &(t->wait_status)->elem);
+    // list_push_back(&parent->children, &(t->wait_status)->elem);
+  } else {
+    thread_current()->wait_st = malloc(sizeof(*exec_inf->wait_status));
+    cArgs->wait_status = thread_current()->wait_st;
+
+    if (cArgs->wait_status != NULL){
+      cArgs->wait_status->ref_count = 2;
+      cArgs->wait_status->child_tid = thread_current()->tid;
+      sema_init (&(cArgs->wait_status->sema), 0);
+      lock_init (&(cArgs->wait_status->lock));
+    }
   }
+  cArgs->success = success && cArgs->wait_status != NULL;
   sema_up(&parent->child_load_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success)
+  if (!cArgs->success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
