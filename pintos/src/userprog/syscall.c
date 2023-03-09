@@ -9,6 +9,7 @@
 #include "filesys/inode.h"
 #include "threads/vaddr.h"
 #include <string.h>
+#include "devices/shutdown.h"
 
 #define MAX_SYSCALL_ARGUMENTS 10
 #define MAX_NAME_SIZE 14
@@ -154,6 +155,18 @@ sys_create(const char* name, off_t initial_size)
   }
 }
 
+int
+sys_read(const char* fd, void * buff, off_t initial_size) {
+  if (fd == STDOUT_FILENO)
+    sys_exit(-1);
+  if (fd < 0 || fd > thread_current()->fd_count) 
+    sys_exit(-1);
+  struct file *f = get_file_by_fd(fd);
+  if (!f)
+    return -1;
+  return file_read(f, buff, initial_size);
+}
+
 
 void sys_halt(void) {
   shutdown_power_off();
@@ -196,10 +209,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_PRACTICE) {
     validate_args (f->esp, 1);
     f->eax = args[1] + 1;
-  }  else if ( args[0] == SYS_CLOSE) {
+  } else if ( args[0] == SYS_CLOSE) {
      validate_args (f->esp, 1);
     //  sys_close((int)args[1]);     
-  }  else if (  args[0] == SYS_FILESIZE) {
+  } else if (  args[0] == SYS_FILESIZE) {
     validate_args (f->esp, 1);
     if ( args[1] < 2 ) {
       f->eax = -1;
@@ -214,8 +227,11 @@ syscall_handler (struct intr_frame *f UNUSED)
   	}
     else if (args[1] >= 2 ) 
     file_seek(file, (off_t) args[2]);
+  } else if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+  } else if (args[0] == SYS_READ) {
+    validate_args(f->esp, 3);
+    f->eax = sys_read(args[1], args[2], args[3]);
   }
-  else if (args[0] == SYS_HALT) {
-       shutdown_power_off(); }
 
 }
