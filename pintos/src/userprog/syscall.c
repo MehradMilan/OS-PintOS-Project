@@ -189,6 +189,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   validate_addr ((void *) args + sizeof (void *) - 1);
 
   if (args[0] == SYS_EXIT) {
+    validate_args(f->esp, 1);
     f->eax = args[1];
     printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
     thread_exit ();
