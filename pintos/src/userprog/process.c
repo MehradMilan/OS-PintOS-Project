@@ -59,6 +59,12 @@ tokenize(char* cmd_line)
   return true;
 }
 
+struct argStruct {
+  void *file_name_;
+  struct thread *parent;
+};
+
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -77,18 +83,33 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  struct thread *t = thread_current ();
+  struct argStruct args;
+  args.file_name_ = fn_copy;
+  args.parent = t;
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, &args);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  return tid;
+  
+  sema_down(&t->child_load_sema);
+  if (t->load_success) {
+    return tid;
+  } else {
+    return -1;
+  }
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (struct argStruct *args)
 {
+  void *file_name_ = args->file_name_;
+  struct thread *parent = args->parent;
+  struct thread *t = thread_current ();
+
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -99,6 +120,15 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+
+  /* set load status */
+  parent->load_success = success;
+  if (success) {
+    /* add child's wait_status to children list */
+    list_push_back(&parent->children, &(t->wait_status)->elem);
+  }
+  sema_up(&parent->child_load_sema);
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success)
@@ -126,6 +156,22 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  struct list all_list = cur->children;
+  int find_waited_thread = 0;
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+    struct thread *t = list_entry (e, struct thread, allelem);
+    if (t->tid == child_tid) {
+      find_waited_thread = 1;
+      break;
+    }
+  }
+
+  if (!find_waited_thread) {
+    return -1;
+  }
+
   sema_down (&temporary);
   return 0;
 }
