@@ -143,15 +143,15 @@ start_process (struct cArgs *cArgs)
       sema_init (&(cArgs->wait_status->sema), 0);
       lock_init (&(cArgs->wait_status->lock));
     }
+  
+    cArgs->success = success && cArgs->wait_status != NULL;
+    sema_up(&cArgs->child_load_sema);
+
+    /* If load failed, quit. */
+    palloc_free_page (file_name);
+    if (!cArgs->success)
+      thread_exit ();
   }
-  cArgs->success = success && cArgs->wait_status != NULL;
-  sema_up(&parent->child_load_sema);
-
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!cArgs->success)
-    thread_exit ();
-
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
