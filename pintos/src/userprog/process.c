@@ -134,8 +134,8 @@ start_process (struct cArgs *cArgs)
     /* add child's wait_status to children list */
     // list_push_back(&parent->children, &(t->wait_status)->elem);
   } else {
-    thread_current()->wait_status = malloc(sizeof(*cArgs->wait_status));
-    cArgs->wait_status = thread_current()->wait_st;
+    thread_current()->wait_status = (wait_status *)malloc(sizeof(*cArgs->wait_status));
+    cArgs->wait_status = thread_current()->wait_status;
 
     if (cArgs->wait_status != NULL){
       cArgs->wait_status->ref_cnt = 2;
