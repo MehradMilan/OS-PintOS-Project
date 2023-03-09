@@ -121,8 +121,7 @@ sys_write (int fd_num, const void *buffer, unsigned size)
   if (fd_num <= STDIN_FILENO || !fd_num || fd_num > thread_current()->fd_count) {
     sys_exit(-1);
   }
-  for (int i = 0; validate_addr(buffer + i) && i < size ; ++i);
-  int bytes_written = 0;
+  int bytes_written = size;
   if (fd_num == STDOUT_FILENO)
   {
     putbuf (buffer, size);
