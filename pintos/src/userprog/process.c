@@ -18,6 +18,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 #define MAX_ARGUMENTS        32
 #define MAX_ARGUMENT_LENGTH  1024
@@ -60,7 +61,7 @@ tokenize(char* cmd_line)
 }
 
 struct argStruct {
-  void *file_name_;
+  char *file_name;
   struct thread *parent;
 };
 
@@ -85,7 +86,7 @@ process_execute (const char *file_name)
 
   struct thread *t = thread_current ();
   struct argStruct args;
-  args.file_name_ = fn_copy;
+  args.file_name = fn_copy;
   args.parent = t;
 
   /* Create a new thread to execute FILE_NAME. */
@@ -104,13 +105,13 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (struct argStruct *args)
+start_process (void *args_)
 {
-  void *file_name_ = args->file_name_;
+  struct argStruct *args = args_;
+  char *file_name = args->file_name;
   struct thread *parent = args->parent;
   struct thread *t = thread_current ();
 
-  char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
@@ -144,6 +145,18 @@ start_process (struct argStruct *args)
   NOT_REACHED ();
 }
 
+void wait_status_helper(struct wait_status *ws) {
+  lock_acquire(&ws->lock);
+  ws->ref_cnt -= 1;
+  if (ws->ref_cnt == 0) {
+    lock_release(&ws->lock);
+    list_remove(&ws->elem);
+    // free(ws);
+  } else {
+    lock_release(&ws->lock);
+  }
+}
+
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -158,22 +171,24 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
-  struct list all_list = cur->children;
   int find_waited_thread = 0;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
-    struct thread *t = list_entry (e, struct thread, allelem);
-    if (t->tid == child_tid) {
-      find_waited_thread = 1;
-      break;
-    }
-  }
+  struct wait_status *ws;
+  // for (e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next (e)) {
+  //   ws = list_entry (e, struct wait_status, elem);
+  //   if (ws->tid == child_tid) {
+  //     find_waited_thread = 1;
+  //     break;
+  //   }
+  // }
 
   if (!find_waited_thread) {
     return -1;
   }
 
-  sema_down (&temporary);
-  return 0;
+  sema_down(&ws->dead);
+  int exit_code = ws->exit_code;
+  wait_status_helper(ws);
+  return exit_code;
 }
 
 /* Free the current process's resources. */
@@ -182,6 +197,11 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  struct wait_status *cur_ws = cur->wait_status;
+  wait_status_helper(cur_ws);
+
+  struct list_elem *e;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -199,7 +219,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  sema_up (&temporary);
+  
+  sema_up (&cur_ws->dead);
 }
 
 /* Sets up the CPU for running user code in the current
