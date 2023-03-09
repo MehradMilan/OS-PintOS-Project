@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -108,7 +109,7 @@ process_execute (const char *file_name)
     palloc_free_page(fn_copy);
     return TID_ERROR;
   }
-  list_push_back(&thread_current()->ws_children, &cArgs.wait_status->elem);
+  list_push_back(&thread_current()->children, &cArgs.wait_status->elem);
 
   return tid;
 }
@@ -141,15 +142,15 @@ start_process (struct cArgs *cArgs)
     // list_push_back(&parent->children, &(t->wait_status)->elem);
   // } else {
     thread_current()->wait_st = malloc(sizeof(*cArgs->wait_status));
-    cArgs->wait_status = thread_current()->wait_status;
+    cArgs->wait_status = thread_current()->wait_st;
 
     if (cArgs->wait_status != NULL) {
       cArgs->wait_status->ref_cnt = 2;
-      cArgs->wait_status->tid = thread_current()->tid;
+      cArgs->wait_status-child_tid = thread_current()->tid;
       cArgs->wait_status->exit_code = -1;
-      sema_init(&(cArgs->wait_status->dead), 0);
+      sema_init(&(cArgs->wait_status->sema), 0);
       lock_init(&(cArgs->wait_status->lock));
-      list_push_back(&thread_current->ws_children, &cArgs->wait_status->elem);
+      list_push_back(&thread_current->children, &cArgs->wait_status->elem);
     }
   
     cArgs->success = success && cArgs->wait_status != NULL;
@@ -185,23 +186,30 @@ start_process (struct cArgs *cArgs)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
-  struct list all_list = cur->ws_children;
-  int find_waited_thread = 0;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
-    if (t->tid == child_tid) {
-      find_waited_thread = 1;
-      break;
-    }
-  }
+	int exit_code = -1;
+	struct wait_status *child_wait_st = try_get_wait_st(child_tid);
+	if (child_wait_st == NULL) {
+		return exit_code;
+	}
+	sema_down(&child_wait_st->sema);
+	list_remove(&child_wait_st->elem);
+	exit_code = child_wait_st->exit_code;
+	return exit_code;
+}
 
-  if (!find_waited_thread) {
-    return -1;
-  }
-
-  sema_down (&temporary);
-  return 0;
+struct wait_status*
+try_get_wait_st(tid_t child_tid) {
+	struct thread *cur_thread = thread_current();
+	struct list_elem *cur_child = list_begin(&cur_thread->children);
+	struct list_elem *last_child = list_end(&cur_thread->children);
+	while (cur_child != last_child) {
+		struct wait_status *child_wait_st = list_entry(cur_child, struct wait_status, elem);
+		cur_child = list_next(cur_child);
+		if (child_wait_st->child_tid == child_tid) {
+			return child_wait_st;
+		}
+	}
+	return NULL;
 }
 
 /* Free the current process's resources. */
@@ -227,7 +235,19 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  sema_up (&temporary);
+	  /* Set exit code and up wait_status sema */
+    if (cur->wait_st != NULL) {
+      //cur->wait_st->exit_code = cur->exit_code;
+      printf("%s: exit(%d)\n", &cur->name, cur->wait_st->exit_code);
+      int ref_count;
+      lock_acquire (&cur->wait_st->lock);
+      cur->wait_st->ref_cnt -= 1;
+      ref_count = cur->wait_st->ref_cnt;
+      lock_release (&cur->wait_st->lock);
+      /*if (ref_count == 0) {
+        free(cur->wait_st);
+      }*/
+    }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -358,6 +378,9 @@ load (char *file_name, void (**eip) (void), void **esp)
       goto done;
     }
 
+  file_deny_write(file);
+  t->exec_file = file;
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -441,7 +464,7 @@ load (char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // file_close (file);
   return success;
 }
 

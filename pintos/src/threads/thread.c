@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -464,9 +465,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  wait_status_init(&t->wait_status, t->tid);
-  list_init(&t->children);
-  sema_init(&t->child_load_sema, 0);
+  thread_init(t);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -584,12 +583,13 @@ allocate_tid (void)
 }
 
 /* init function for wait_status struct. */
-void wait_status_init (struct wait_status *ws, tid_t tid){
-  lock_init (&ws->lock);
-  ws->ref_cnt = 2;
-  ws->tid = tid;
-  ws->exit_code = NULL;
-  sema_init (&ws->dead, 0);
+void thread_init (struct thread *t){
+  t->exit_code = -1;
+  t->wait_st = NULL;
+  list_init (&t->children);
+  list_init(&t->file_table);
+  t->fd_count = 2;
+  t->exec_file = NULL;
 }
 
 

@@ -95,9 +95,9 @@ struct wait_status {
   struct list_elem elem;            /* 'children' list element. */
   struct lock lock;                 /* Protects ref_cnt. */
   int ref_cnt;                      /* 2 = child and parent both alive, 1 = either child or parent alive,  */    
-  tid_t tid;                        /* Child thread id. */
+  tid_t child_tid;                        /* Child thread id. */
   int exit_code;                    /* Child exit code, if dead. */
-  struct semaphore dead;            /* 0 = child alive, 1 = child dead. */
+  struct semaphore sema;            /* 0 = child alive, 1 = child dead. */
 };
 
 struct thread
@@ -122,11 +122,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     int exit_code;                      /* The exit code set when the thread completes */
     struct wait_status *wait_st;        /* The wait status of the thread */
-    struct list ws_children;               /* List of wait_status's of children */
+    struct list children;               /* List of wait_status's of children */
     
-    // struct list file_table;             /* List of file_entry's for thread. */
-    // int fd_count;                       /* Current file descriptor number for file_table. */
-    // struct file* exec_file;             /* Current executing file. */
+    struct list file_table;             /* List of file_entry's for thread. */
+    int fd_count;                       /* Current file descriptor number for file_table. */
+    struct file* exec_file;             /* Current executing file. */
 #endif
 
     /* Owned by thread.c. */
