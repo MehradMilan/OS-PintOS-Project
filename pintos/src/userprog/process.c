@@ -63,6 +63,7 @@ struct cArgs {
   void *file_name;
   struct semaphore load_sema;
   struct wait_status *wait_status;
+  struct thread *parent;
   bool success;
 }
 
@@ -84,9 +85,14 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  size_t len = (strcspn(file_name, " ") + 1) * sizeof(char);
+  char *thread_name = malloc(len);
+  strlcpy(thread_name, file_name, len);
+
   struct thread *t = thread_current();
   struct cArgs cArgs;
   cArgs.file_name = fn_copy;
+  cArgs.parent = t;
   sema_init(&cArgs.load_sema, 0);
   
 
@@ -128,30 +134,35 @@ start_process (struct cArgs *cArgs)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* set load status */
-  if (!success) {
-    palloc_free_page(file_name);
-    thread_exit ();
+  if (success) {
+    // palloc_free_page(file_name);
+    // thread_exit ();
     /* add child's wait_status to children list */
     // list_push_back(&parent->children, &(t->wait_status)->elem);
-  } else {
-    thread_current()->wait_status = (wait_status *)malloc(sizeof(*cArgs->wait_status));
+  // } else {
+    thread_current()->wait_st = malloc(sizeof(*cArgs->wait_status));
     cArgs->wait_status = thread_current()->wait_status;
 
-    if (cArgs->wait_status != NULL){
+    if (cArgs->wait_status != NULL) {
       cArgs->wait_status->ref_cnt = 2;
       cArgs->wait_status->tid = thread_current()->tid;
+      cArgs->wait_status->exit_code = -1;
       sema_init(&(cArgs->wait_status->dead), 0);
       lock_init(&(cArgs->wait_status->lock));
+      list_push_back(&thread_current->children, &cArgs->wait_status->elem);
     }
   
     cArgs->success = success && cArgs->wait_status != NULL;
-    sema_up(&cArgs->load_sema);
 
     /* If load failed, quit. */
     palloc_free_page (file_name);
-    if (!cArgs->success)
-      thread_exit ();
+    
   }
+  sema_up(&cArgs->load_sema);
+
+  if (!cArgs->success)
+    thread_exit ();
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
