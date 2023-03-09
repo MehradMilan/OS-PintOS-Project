@@ -113,9 +113,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    struct list fd_list;
+    // struct list fd_list;
 
-    int fd_count; 
+    // int fd_count; 
    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
