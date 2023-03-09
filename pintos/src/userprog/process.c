@@ -60,11 +60,18 @@ tokenize(char* cmd_line)
   return true;
 }
 
+<<<<<<< HEAD
 struct argStruct {
   char *file_name;
+=======
+struct cArgs {
+  void *file_name;
+  struct semaphore load_sema;
+  struct wait_status *wait_status;
+>>>>>>> 245059fde5fe7baac4a8bcdb08145fc50fc41d04
   struct thread *parent;
-};
-
+  bool success;
+}
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -84,27 +91,45 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+<<<<<<< HEAD
   struct thread *t = thread_current ();
   struct argStruct args;
   args.file_name = fn_copy;
   args.parent = t;
+=======
+  size_t len = (strcspn(file_name, " ") + 1) * sizeof(char);
+  char *thread_name = malloc(len);
+  strlcpy(thread_name, file_name, len);
+
+  struct thread *t = thread_current();
+  struct cArgs cArgs;
+  cArgs.file_name = fn_copy;
+  cArgs.parent = t;
+  sema_init(&cArgs.load_sema, 0);
+  
+>>>>>>> 245059fde5fe7baac4a8bcdb08145fc50fc41d04
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, &args);
-  if (tid == TID_ERROR)
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, &cArgs);
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy);
-  
-  sema_down(&t->child_load_sema);
-  if (t->load_success) {
-    return tid;
-  } else {
-    return -1;
+    return TID_ERROR;
   }
+
+  sema_down(&(cArgs.load_same));
+  if (!cArgs.success){
+    palloc_free_page(fn_copy);
+    return TID_ERROR;
+  }
+  list_push_back(&thread_current()->ws_children, &cArgs.wait_status->elem);
+
+  return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
+<<<<<<< HEAD
 start_process (void *args_)
 {
   struct argStruct *args = args_;
@@ -112,6 +137,15 @@ start_process (void *args_)
   struct thread *parent = args->parent;
   struct thread *t = thread_current ();
 
+=======
+start_process (struct cArgs *cArgs)
+{
+  void *file_name = cArgs->file_name;
+  // struct thread *parent = args->parent;
+  // struct thread *t = thread_current ();
+
+  // char *file_name = file_name_;
+>>>>>>> 245059fde5fe7baac4a8bcdb08145fc50fc41d04
   struct intr_frame if_;
   bool success;
 
@@ -123,16 +157,33 @@ start_process (void *args_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* set load status */
-  parent->load_success = success;
   if (success) {
+    // palloc_free_page(file_name);
+    // thread_exit ();
     /* add child's wait_status to children list */
-    list_push_back(&parent->children, &(t->wait_status)->elem);
-  }
-  sema_up(&parent->child_load_sema);
+    // list_push_back(&parent->children, &(t->wait_status)->elem);
+  // } else {
+    thread_current()->wait_st = malloc(sizeof(*cArgs->wait_status));
+    cArgs->wait_status = thread_current()->wait_status;
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success)
+    if (cArgs->wait_status != NULL) {
+      cArgs->wait_status->ref_cnt = 2;
+      cArgs->wait_status->tid = thread_current()->tid;
+      cArgs->wait_status->exit_code = -1;
+      sema_init(&(cArgs->wait_status->dead), 0);
+      lock_init(&(cArgs->wait_status->lock));
+      list_push_back(&thread_current->ws_children, &cArgs->wait_status->elem);
+    }
+  
+    cArgs->success = success && cArgs->wait_status != NULL;
+
+    /* If load failed, quit. */
+    palloc_free_page (file_name);
+    
+  }
+  sema_up(&cArgs->load_sema);
+
+  if (!cArgs->success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
@@ -171,6 +222,7 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
+<<<<<<< HEAD
   int find_waited_thread = 0;
   struct wait_status *ws;
   // for (e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next (e)) {
@@ -180,6 +232,16 @@ process_wait (tid_t child_tid UNUSED)
   //     break;
   //   }
   // }
+=======
+  struct list all_list = cur->ws_children;
+  int find_waited_thread = 0;
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+    if (t->tid == child_tid) {
+      find_waited_thread = 1;
+      break;
+    }
+  }
+>>>>>>> 245059fde5fe7baac4a8bcdb08145fc50fc41d04
 
   if (!find_waited_thread) {
     return -1;
