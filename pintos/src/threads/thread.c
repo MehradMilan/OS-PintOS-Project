@@ -605,7 +605,7 @@ struct thread
   while ((e = list_next(e)) != list_end(&all_list)) {
     t = list_entry (e,
       struct thread, allelem);
-    if (t->tid == id && t->status != THREAD_DYING) {
+    if (t->tid == t_id && t->status != THREAD_DYING) {
       res = list_entry (e,
       struct thread, allelem);
       break;
