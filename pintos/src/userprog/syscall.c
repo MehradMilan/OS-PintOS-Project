@@ -19,7 +19,7 @@ static void syscall_handler (struct intr_frame *);
 
 void sys_exit (int status);
 int sys_write (int fd_num, const void *buffer, unsigned size);
-int sys_create (const char* name, off_t initial_size);
+int sys_create (const char* name, unsigned initial_size);
 
 void
 syscall_init (void)
@@ -56,7 +56,7 @@ validate_args (void *esp, int argc)
 return 1;
 }
 
-struct file* get_file_by_fd(int fd) {
+struct file* get_fd_by_num(int num) {
   struct list *fd_list = &thread_current ()->fd_list;
   struct list_elem *e;
 
@@ -64,8 +64,8 @@ struct file* get_file_by_fd(int fd) {
        e = list_next (e))
     {
       struct file_descriptor *f = list_entry (e, struct file_descriptor, elem);
-      if (f->fd == fd)
-        return f->file;
+      if (f->fd == num)
+        return f;
     }
   return NULL;
 }
@@ -78,7 +78,6 @@ sys_open (const char *name)
   return -1; 
   }
   char * ptr; 
-  for (ptr = name ; validate_addr (ptr) && *ptr != '\0'; ++ptr);
   struct file *f = filesys_open(name);
   if (f == NULL) { 
     return -1;
@@ -96,22 +95,18 @@ sys_open (const char *name)
   }
 }
 
-void
-sys_close (int fd) 
+int
+sys_close (int fdnum) 
 {
-  struct file * file_ = get_file_by_fd(fd);
-  if (file_ != NULL)
-    {
-      file_close(file_);
-      struct list *fd_list = &thread_current ()->fd_list;
-      struct list_elem *e;
-       for (e = list_begin (fd_list); e != list_end (fd_list);e = list_next (e)){
-      struct file_descriptor *f = list_entry(e, struct file_descriptor, elem);
-      if (f->fd == fd) 
-      {list_remove (&f->elem); 
-        return; }
-       }
-    }
+  if (fdnum <= STDOUT_FILENO)
+    sys_exit(-1);
+  struct file_descriptor *fd = get_fd_by_num(fdnum);
+  if (!fd)
+    return -1;
+  file_close(fd->file);
+  list_remove(&fd->elem);
+  free(fd);
+  return 0;
 }
 
 
@@ -127,7 +122,8 @@ sys_write (int fd_num, const void *buffer, unsigned size)
     putbuf (buffer, size);
     bytes_written = size;
   } else {
-    struct file *f = get_file_by_fd(fd_num); 
+    struct file_descriptor *f_descriptor = get_fd_by_num(fd_num);
+    struct file *f = f_descriptor->file; 
     if (!f){
       sys_exit(-1);
     }
@@ -138,7 +134,7 @@ sys_write (int fd_num, const void *buffer, unsigned size)
 }
 
 int
-sys_create(const char* name, off_t initial_size)
+sys_create(const char* name, unsigned initial_size)
 {
   char * ptr; 
   for (ptr = name ; validate_addr (ptr) && *ptr != '\0'; ++ptr);
@@ -152,17 +148,40 @@ sys_create(const char* name, off_t initial_size)
 }
 
 int
-sys_read(int fd, void * buff, off_t initial_size) {
+sys_read(int fd, void * buff, unsigned initial_size) {
   if (fd == STDOUT_FILENO)
     sys_exit(-1);
   if (fd < 0 || fd > thread_current()->fd_count) 
     sys_exit(-1);
-  struct file *f = get_file_by_fd(fd);
+  struct file_descriptor *f_descriptor = get_fd_by_num(fd);
+  struct file *f = f_descriptor->file; 
   if (!f)
     return -1;
   return file_read(f, buff, initial_size);
 }
 
+void
+sys_seek(int fd_num, unsigned pos) {
+  if (fd_num <= STDIN_FILENO || !fd_num || fd_num > thread_current()->fd_count)
+    sys_exit(-1);
+  if (fd_num <= STDOUT_FILENO)
+    sys_exit(-1);
+  struct file_descriptor *f_descriptor = get_fd_by_num(fd_num);
+  if (f_descriptor != NULL)
+    file_seek(f_descriptor->file, pos);
+}
+
+int
+sys_tell(int fd_num) {
+  if (fd_num <= STDIN_FILENO || !fd_num || fd_num > thread_current()->fd_count)
+    sys_exit(-1);
+  if (fd_num <= STDOUT_FILENO)
+    sys_exit(-1);
+  struct file_descriptor *f_descriptor = get_fd_by_num(fd_num);
+  if (f_descriptor == NULL)
+    return -1;  
+  return file_tell(f_descriptor->file);
+}
 
 void sys_halt(void) {
   shutdown_power_off();
@@ -207,22 +226,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = args[1] + 1;
   } else if (args[0] == SYS_CLOSE) {
      validate_args (f->esp, 1);
+     f->eax = sys_close(args[1]);
   } else if (args[0] == SYS_FILESIZE) {
     validate_args (f->esp, 1);
     if (args[1] < 2) {
       f->eax = -1;
     } else {
-      struct file *file_ = get_file_by_fd(args[1]);
+      struct file_descriptor *f_descriptor = get_fd_by_num(args[1]);
+      struct file *file_ = f_descriptor->file; 
       f->eax = file_length(file_); 
     }
   } else if (args[0] == SYS_SEEK) {
-    struct file *file = get_file_by_fd(args[1]);
-    if (file == NULL) {
-      f->eax = -1;
-    	sys_exit( -1); 
-  	}
-    else if (args[1] >= 2 ) 
-    file_seek(file, (off_t) args[2]);
+    sys_seek(args[1], args[2]);
+  } else if (args[0] == SYS_TELL) {
+    f->eax = sys_tell(args[1]);
   } else if (args[0] == SYS_HALT) {
     shutdown_power_off();
   } else if (args[0] == SYS_READ) {
