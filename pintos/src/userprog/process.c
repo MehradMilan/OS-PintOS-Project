@@ -51,7 +51,7 @@ tokenize(char* cmd_line)
   for (c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr)) {
       argv[argc] = c;
       // addrs[argc] = &argv[argc];
-      argc ++;
+      argc++;
     }
 
   /* Return false if argv is left. */
@@ -103,7 +103,7 @@ process_execute (const char *file_name)
   
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, &c_args);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, c_args);
   if (tid == TID_ERROR){
     free_on_error(ps, fn_copy);
     return TID_ERROR;
@@ -113,7 +113,8 @@ process_execute (const char *file_name)
 
   if (ps->exit_code != 0 && ps->is_exited){
     list_remove(&ps->children_elem);
-    return ps->exit_code;
+    free(ps);
+    return -1;
   }
 
   return tid;
@@ -145,7 +146,7 @@ thread_finish(struct thread *t, char *fn){
 static void
 start_process (struct cArgs *c_args)
 {
-  void *file_name = c_args->file_name;
+  char *file_name = c_args->file_name;
   struct thread *t = thread_current();
   struct intr_frame if_;
   bool success;
@@ -156,8 +157,8 @@ start_process (struct cArgs *c_args)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  // tmp = tokenize(file_name);
-  success = load (argv[0], &if_.eip, &if_.esp);
+  tokenize(file_name);
+  success = load (file_name, &if_.eip, &if_.esp);
 
   strlcpy (t->name, file_name, sizeof t->name);
   t->ps = c_args->ps;
@@ -167,15 +168,17 @@ start_process (struct cArgs *c_args)
 
   init_cur_dir(t, c_args);
 
+  free(c_args);
+
   /* set load status */
   if (!success)
     thread_finish(t, file_name);
 
-  tokenize(file_name);
+  //tokenize(file_name);
   // if (!tokenize_status)
   //   thread_finish(t, file_name);
 
-  bool res = fill_args_in_stack((int *) &if_.esp, file_name);
+  int res = fill_args_in_stack((int *) &if_.esp, file_name);
   
   palloc_free_page (file_name);
   sema_up(&(t->ps->ws));
@@ -446,7 +449,6 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   // memcpy(thread_current()->name, argv[0], 15);
   // thread_current()->name[15] = '\0';
-
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL)
@@ -656,7 +658,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Adds arguments and corresponding argc and argv to stack and
  * decreases esp. */
 int
-fill_args_in_stack (void **esp, char *fn)
+fill_args_in_stack (int *esp, char *fn)
 {
   /* pushing cmd's content */
   int fn_len = strlen(fn);
