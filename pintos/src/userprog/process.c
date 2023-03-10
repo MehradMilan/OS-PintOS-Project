@@ -273,6 +273,8 @@ process_exit (void)
   else
     sema_up(&(cur->ps->ws));
 
+  if (cur->working_dir != NULL)
+    dir_close (cur->working_dir);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
