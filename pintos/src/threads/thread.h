@@ -124,7 +124,7 @@ struct thread
    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    // uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;                  /* Page directory. */
     // int exit_code;                      /* The exit code set when the thread completes */
     // struct wait_status *wait_st;        /* The wait status of the thread */
     // struct list children;               /* List of wait_status's of children */
