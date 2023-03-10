@@ -188,6 +188,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 /* init function for wait_status struct. */
-void wait_status_init (struct wait_status *, tid_t tid);
-
+// void wait_status_init (struct wait_status *, tid_t tid);
+struct thread *find_thread (tid_t);
 #endif /* threads/thread.h */

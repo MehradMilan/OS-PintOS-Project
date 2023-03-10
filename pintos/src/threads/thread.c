@@ -588,11 +588,11 @@ allocate_tid (void)
   return tid;
 }
 
-/* init function for wait_status struct. */
 void init_thread_ (struct thread *t){
-  // memset (&(t->fd_list), 0, sizeof (struct list));
+  t->fd_count = 2;
+  memset (&(t->fd_list), 0, sizeof (struct list));
   list_init (&t->fd_list);
-  // memset (&(t->children), 0, sizeof (struct list));
+  memset (&(t->children), 0, sizeof (struct list));
   list_init (&(t->children));
 }
 

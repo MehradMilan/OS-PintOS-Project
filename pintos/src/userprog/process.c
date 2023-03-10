@@ -197,17 +197,17 @@ start_process (struct cArgs *c_args)
   NOT_REACHED ();
 }
 
-void wait_status_helper(struct wait_status *ws) {
-  lock_acquire(&ws->lock);
-  ws->ref_cnt -= 1;
-  if (ws->ref_cnt == 0) {
-    lock_release(&ws->lock);
-    list_remove(&ws->elem);
-    // free(ws);
-  } else {
-    lock_release(&ws->lock);
-  }
-}
+// void wait_status_helper(struct wait_status *ws) {
+//   lock_acquire(&ws->lock);
+//   ws->ref_cnt -= 1;
+//   if (ws->ref_cnt == 0) {
+//     lock_release(&ws->lock);
+//     list_remove(&ws->elem);
+//     // free(ws);
+//   } else {
+//     lock_release(&ws->lock);
+//   }
+// }
 
 struct process_status *
 find_child (struct thread *t, tid_t child_tid)
@@ -267,7 +267,7 @@ process_exit (void)
   free_fds(cur);
   free_children(cur);
 
-  if (cur->ps->rc)
+  if (cur->ps->r == 0)
     free(cur->ps);
   else
     sema_up(&(cur->ps->ws));
@@ -655,50 +655,41 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 int
 fill_args_in_stack (void **esp, char *fn)
 {
-  /* Put command itself */
+  /* pushing cmd's content */
   int fn_len = strlen(fn);
-  *esp -= (fn_len + 1);
-  int esp_argv_handler = *esp;
-  memcpy(*esp, fn, fn_len + 1);
+  *esp -= fn_len + 1;
+  memcpy ((void *) *esp, fn, fn_len + 1);
+  int argv_offset = *esp;
 
-  /* Align stack. */
-  const int align_size = ((size_t) *esp) % 4;
+  /* stack align */
+  int align_size = ((unsigned int) *esp) % 4;
   *esp -= align_size;
-  memset (*esp, 0xff, align_size);
+  memset ((void *) *esp, 0xff, align_size);
 
-  /* Put argv[argc]. */
+  /* argv[argc+1]=NULL; */
   *esp -= 4;
-  memset(*esp, 0, 4);
+  memset ((void *) *esp, 0, 4);
 
-  /* Put argv. */
-  *esp -= argc * 4;
-  const char *tmp = fn;
+  /* pushing argv */
+  *esp -= 4 * argc;
+  const char *arg = fn;
   for (int i = 0; i < argc; i++)
-  {
-    int len = strlen(argv[i]);
-    esp_argv_handler += len;
+    {
+      /* trimming args */
+      int i = 0;
+      while (*(arg + i) == 0 || *(arg + i) == ' ')
+        i++;
+      arg += i;
+      argv_offset += i;
 
-    *((int *) (*esp)) = esp_argv_handler;
-    fn_len -= len;
-    esp_argv_handler += (fn_len + 1);
-    *esp += 4;
-  }
+      /* pushing the current argv and moving to the next one */
+      *((int *) (*esp)) = argv_offset;
+      argv_offset += strlen (arg) + 1;
+      arg += strlen (arg) + 1;
+      *esp += 4;
+    }
 
   *esp -= 4 * (argc);
-  
-  // memcpy(*esp, argv, argc * 4);
-  // *esp -= 4;
-  // *((size_t*)*esp) = (size_t)(*esp + 4);
-
-  /* Put argc. */
-//   *esp -= 4;
-//  memset(*esp, &argc, 4);
-//   *((size_t*)*esp) = argc;
-
-  /* Put return address. */
-  // *esp -= 4;
-  // memset(*esp, 0, 4);
-
   return *esp;
 }
 
