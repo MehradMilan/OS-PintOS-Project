@@ -174,6 +174,7 @@ start_process (struct cArgs *c_args)
   if (!success)
     thread_finish(t, file_name);
 
+<<<<<<< HEAD
   //tokenize(file_name);
   // if (!tokenize_status)
   //   thread_finish(t, file_name);
