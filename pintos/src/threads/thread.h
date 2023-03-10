@@ -11,7 +11,7 @@
 struct file_descriptor 
   { 
     int fd ; 
-    struct dir * dir ; 
+    struct dir *dir ; 
     struct file *file ; 
     struct list_elem elem;
   };
@@ -110,8 +110,13 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct dir *working_dir;
+    struct process_status *ps;
+    struct list children;
+    struct list fd_list;
+    int fd_count;
+    struct file *exec_file;
 
     // struct list fd_list;
 
@@ -119,14 +124,14 @@ struct thread
    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-    int exit_code;                      /* The exit code set when the thread completes */
-    struct wait_status *wait_st;        /* The wait status of the thread */
-    struct list children;               /* List of wait_status's of children */
+    // uint32_t *pagedir;                  /* Page directory. */
+    // int exit_code;                      /* The exit code set when the thread completes */
+    // struct wait_status *wait_st;        /* The wait status of the thread */
+    // struct list children;               /* List of wait_status's of children */
     
-    struct list file_table;             /* List of file_entry's for thread. */
-    int fd_count;                       /* Current file descriptor number for file_table. */
-    struct file* exec_file;             /* Current executing file. */
+    // struct list file_table;             /* List of file_entry's for thread. */
+    // int fd_count;                       /* Current file descriptor number for file_table. */
+    // struct file* exec_file;             /* Current executing file. */
 #endif
 
     /* Owned by thread.c. */
