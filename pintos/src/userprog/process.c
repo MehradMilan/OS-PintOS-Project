@@ -85,7 +85,7 @@ process_execute (const char *file_name)
   ps->is_exited = false;
 
   struct thread *t = thread_current();
-  // todo: check list_push_back here.
+  list_push_back (&(t->children), &ps->children_elem);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -112,11 +112,9 @@ process_execute (const char *file_name)
   sema_down(&ps->ws);
 
   if (ps->exit_code != 0 && ps->is_exited){
-    free_on_error(ps, fn_copy);
+    list_remove(&ps->children_elem);
     return ps->exit_code;
   }
-
-  list_push_back (&(t->children), &ps->children_elem);
 
   return tid;
 }
@@ -151,20 +149,21 @@ start_process (struct cArgs *c_args)
   struct thread *t = thread_current();
   struct intr_frame if_;
   bool success;
-  bool tmp;
+  // bool tmp;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  tmp = tokenize(file_name);
+  // tmp = tokenize(file_name);
   success = load (argv[0], &if_.eip, &if_.esp);
 
   strlcpy (t->name, file_name, sizeof t->name);
   t->ps = c_args->ps;
   t->ps->pid = t->tid;
   list_init(&t->children);
+  // sema_init(&(t->ps)->ws, 0);
 
   init_cur_dir(t, c_args);
 
@@ -172,9 +171,9 @@ start_process (struct cArgs *c_args)
   if (!success)
     thread_finish(t, file_name);
 
-  bool tokenize_status = tokenize(file_name);
-  if (!tokenize_status)
-    thread_finish(t, file_name);
+  tokenize(file_name);
+  // if (!tokenize_status)
+  //   thread_finish(t, file_name);
 
   bool res = fill_args_in_stack((int *) &if_.esp, file_name);
   
