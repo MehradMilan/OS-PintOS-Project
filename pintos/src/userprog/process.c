@@ -267,7 +267,7 @@ process_exit (void)
   free_fds(cur);
   free_children(cur);
 
-  if (cur->ps->r == 0)
+  if (cur->ps->rc == 0)
     free(cur->ps);
   else
     sema_up(&(cur->ps->ws));
