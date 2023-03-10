@@ -163,6 +163,7 @@ start_process (struct cArgs *c_args)
   t->ps = c_args->ps;
   t->ps->pid = t->tid;
   list_init(&t->children);
+  list_init(&t->fd_list);
 
   init_cur_dir(t, c_args);
 
@@ -197,7 +198,7 @@ start_process (struct cArgs *c_args)
   NOT_REACHED ();
 }
 
-void wait_status_helper(struct wait_status *ws) {
+/*void wait_status_helper(struct wait_status *ws) {
   lock_acquire(&ws->lock);
   ws->ref_cnt -= 1;
   if (ws->ref_cnt == 0) {
@@ -207,7 +208,7 @@ void wait_status_helper(struct wait_status *ws) {
   } else {
     lock_release(&ws->lock);
   }
-}
+}*/
 
 struct process_status *
 find_child (struct thread *t, tid_t child_tid)
@@ -249,6 +250,7 @@ process_wait (tid_t child_tid)
   free(child);
 
   return res;
+
 }
 
 /* Free the current process's resources. */
