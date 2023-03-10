@@ -17,7 +17,7 @@ struct process_status
     int rc;	
     struct lock rc_lock;	
     struct list_elem children_elem;
-  }
+  };
 
 void init_process_status (struct process_status *);	
 void decrease_rc (struct process_status *);	
