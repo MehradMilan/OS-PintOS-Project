@@ -61,13 +61,6 @@ tokenize(char* cmd_line)
   return true;
 }
 
-struct cArgs {
-  char *file_name;
-  struct thread *parent;
-  struct dir *cur_dir;
-  bool success;
-  struct process_status *ps;
-};
 
 void
 free_on_error(struct process_status *ps, char *file_cp){

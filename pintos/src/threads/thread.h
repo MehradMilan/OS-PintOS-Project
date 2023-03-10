@@ -100,6 +100,14 @@ struct wait_status {
   struct semaphore sema;            /* 0 = child alive, 1 = child dead. */
 };
 
+struct cArgs {
+  char *file_name;
+  struct thread *parent;
+  struct dir *cur_dir;
+  bool success;
+  struct process_status *ps;
+};
+
 struct thread
   {
     /* Owned by thread.c. */
