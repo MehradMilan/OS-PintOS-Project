@@ -155,7 +155,7 @@ void thread_start (void);
 void thread_tick (void);
 void thread_print_stats (void);
 
-typedef void thread_func (void *aux);
+typedef void thread_func (struct cArgs *c_args);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);

@@ -19,8 +19,6 @@ struct process_status
     struct list_elem children_elem;
   };
 
-void init_process_status (struct process_status *);	
-void decrease_rc (struct process_status *);	
 struct process_status *find_child (struct thread *, tid_t);
 
 #endif /* userprog/process.h */

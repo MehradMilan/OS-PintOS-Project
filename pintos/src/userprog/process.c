@@ -67,7 +67,7 @@ struct cArgs {
   struct dir *cur_dir;
   bool success;
   struct process_status *ps;
-}
+};
 
 void
 free_on_error(struct process_status *ps, char *file_cp){
@@ -88,7 +88,7 @@ process_execute (const char *file_name)
   struct process_status *ps = malloc (sizeof (struct process_status));
   sema_init(&ps->ws, 0);
   lock_init(&ps->rc_lock);
-  pc->rc = 2;
+  ps->rc = 2;
   ps->is_exited = false;
 
   struct thread *t = thread_current();
@@ -101,16 +101,16 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  struct cArgs *c_rgs = malloc(sizeof(struct cArgs));
+  struct cArgs *c_args = malloc(sizeof(struct cArgs));
   c_args->file_name = file_name;
   c_args->parent = t;
-  c_args->cur_dir = t->cur_dir;
+  c_args->cur_dir = t->working_dir;
   c_args->success = false;
   c_args->ps = ps;
   
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, &cArgs);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, &c_args);
   if (tid == TID_ERROR){
     free_on_error(ps, fn_copy);
     return TID_ERROR;
@@ -131,9 +131,9 @@ process_execute (const char *file_name)
 void
 init_cur_dir(struct thread *t, struct cArgs *c_args){
   if (c_args->cur_dir)
-    t->cur_dir = dir_reopen(c_args->cur_dir);
+    t->working_dir = dir_reopen(c_args->cur_dir);
   else
-    t->cur_dir = dir_open_root();
+    t->working_dir = dir_open_root();
 
 }
 
@@ -154,7 +154,7 @@ thread_finish(struct thread *t, char *fn){
 static void
 start_process (struct cArgs *c_args)
 {
-  void *file_name = cArgs->file_name;
+  void *file_name = c_args->file_name;
   struct thread *t = thread_current();
   struct intr_frame if_;
   bool success;
@@ -251,7 +251,7 @@ process_wait (tid_t child_tid)
     return -1;
 
   sema_down (&child->ws);
-  list_remove(&child->children_elem)
+  list_remove(&child->children_elem);
   int res = child->exit_code;
   free(child);
 
@@ -300,7 +300,7 @@ process_exit (void)
 }
 
 
-static void
+void
 free_children (struct thread *cur)
 {
   struct list *children = &cur->children;
@@ -316,15 +316,15 @@ free_children (struct thread *cur)
     }
 }
 
-static void
+void
 free_fds (struct thread *cur)
 {
   struct list *fd_list = &cur->fd_list;
   for (struct list_elem *e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e))
     {
       struct file_descriptor *fd = list_entry (e,
-                                               struct file_descriptor, fd_elem);
-      e = list_remove (&fd->fd_elem)->prev;
+                                               struct file_descriptor, elem);
+      e = list_remove (&fd->elem)->prev;
       file_close (fd->file);
       free (fd);
     }
@@ -659,7 +659,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Adds arguments and corresponding argc and argv to stack and
  * decreases esp. */
-static int
+int
 fill_args_in_stack (void **esp, char *fn)
 {
   /* Put command itself */
