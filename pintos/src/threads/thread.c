@@ -8,7 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
-#include "filesys/filesys.h"	
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
@@ -598,19 +598,20 @@ void init_thread_ (struct thread *t){
 
 
 struct thread
-*find_thread (tid_t id){
-	ASSERT (id != TID_ERROR);	
-  struct list_elem *e;	
-  struct thread *t;	
-  e = list_tail (&all_list);	
-  while ((e = list_prev (e)) != list_head (&all_list))	
-    {	
-      t = list_entry (e,	
-      struct thread, allelem);	
-      if (t->tid == id && t->status != THREAD_DYING)	
-        return t;	
-    }	
-  return NULL;
+*find_thread (tid_t t_id){
+  struct thread *t;
+  struct thread *res = NULL;
+  struct list_elem *e = list_head(&all_list);
+  while ((e = list_next(e)) != list_end(&all_list)) {
+    t = list_entry (e,
+      struct thread, allelem);
+    if (t->tid == t_id && t->status != THREAD_DYING) {
+      res = list_entry (e,
+      struct thread, allelem);
+      break;
+    }
+  }
+  return res;
 }
 
 

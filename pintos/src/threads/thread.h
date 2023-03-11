@@ -7,6 +7,15 @@
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
 
+/* File descriptor */
+struct file_descriptor 
+  { 
+    int fd ; 
+    struct dir *dir ; 
+    struct file *file ; 
+    struct list_elem elem;
+  };
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -82,14 +91,14 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-// struct wait_status {
-//   struct list_elem elem;            /* 'children' list element. */
-//   struct lock lock;                 /* Protects ref_cnt. */
-//   int ref_cnt;                      /* 2 = child and parent both alive, 1 = either child or parent alive,  */    
-//   tid_t child_tid;                        /* Child thread id. */
-//   int exit_code;                    /* Child exit code, if dead. */
-//   struct semaphore sema;            /* 0 = child alive, 1 = child dead. */
-// };
+struct wait_status {
+  struct list_elem elem;            /* 'children' list element. */
+  struct lock lock;                 /* Protects ref_cnt. */
+  int ref_cnt;                      /* 2 = child and parent both alive, 1 = either child or parent alive,  */    
+  tid_t child_tid;                        /* Child thread id. */
+  int exit_code;                    /* Child exit code, if dead. */
+  struct semaphore sema;            /* 0 = child alive, 1 = child dead. */
+};
 
 struct cArgs {
   char *file_name;
