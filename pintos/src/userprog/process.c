@@ -21,7 +21,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 
-#define MAX_ARGUMENTS        32
+#define MAX_ARGUMENTS        64
 #define MAX_ARGUMENT_LENGTH  1024
 #define ARGUMENT_DELIMITER   " "
 
@@ -133,7 +133,7 @@ start_process (struct cArgs *c_args)
 
   int argc = 0;
   int fn_len = strlen (file_name);
-  // /* putting \0 at the end of each word and calculating argc */
+
   char *c, *strtok_saveptr;
   for (c = strtok_r(file_name, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr))
     argc++;
@@ -157,14 +157,6 @@ start_process (struct cArgs *c_args)
   palloc_free_page (file_name);
   sema_up(&(t->ps->ws));
 
-/*  if_.esp -= ((int) ((unsigned int) (if_.esp) % 16) + 8);
-
-  if_.esp -= 8;
-  *((int *) (if_.esp + 4)) = argv;
-  *((int *) (if_.esp)) = argc;
-
-  if_.esp -= 4;
-*/
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
