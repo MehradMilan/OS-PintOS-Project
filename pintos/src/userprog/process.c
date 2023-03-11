@@ -134,9 +134,8 @@ start_process (struct cArgs *c_args)
   int argc = 0;
   int fn_len = strlen (file_name);
   // /* putting \0 at the end of each word and calculating argc */
-  char *token, *save_ptr;
-  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr))
+  char *c, *strtok_saveptr;
+  for (c = strtok_r(file_name, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr))
     argc++;
 
   success = load (file_name, &if_.eip, &if_.esp);
