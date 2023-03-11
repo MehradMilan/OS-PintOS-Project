@@ -25,40 +25,11 @@
 #define MAX_ARGUMENT_LENGTH  1024
 #define ARGUMENT_DELIMITER   " "
 
-static char* argv[MAX_ARGUMENTS];
 static char* addrs[MAX_ARGUMENTS];
-static int argc;
-static bool tokenize(char* cmd_line);
 
 static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
-
-/* Tokenizes the input and sets argc and argv variables accordingly.
- * returns true on sucess, and false otherwise. */
-bool
-tokenize(char* cmd_line)
-{
-  char *c;
-
-  /* Initialize argv and argc */
-  for (argc = 0; argc < MAX_ARGUMENTS; ++ argc)
-    argv[argc] = NULL;  /* empty argv */
-  argc = 0;
-
-  /* Tokenizing the input */
-  char* strtok_saveptr;
-  for (c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr)) {
-      argv[argc] = c;
-      argc++;
-    }
-
-  /* Return false if argv is left. */
-  if (strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
-    return false;
-
-  return true;
-}
 
 
 void
@@ -96,10 +67,8 @@ process_execute (const char *file_name)
   c_args->file_name = fn_copy;
   c_args->parent = t;
   c_args->cur_dir = t->working_dir;
-  c_args->success = false;
   c_args->ps = ps;
   
-
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, c_args);
   if (tid == TID_ERROR){
@@ -130,12 +99,20 @@ void
 thread_finish(struct thread *t, char *fn){
   t->ps->exit_code = -1;
   t->ps->is_exited = true;
-  
   sema_up(&(t->ps->ws));
-  /* If load failed, quit. */
   palloc_free_page (fn);
 
   thread_exit();
+}
+
+int
+calc_argc(char *file_name){
+  char *c;
+  char *strtok_saveptr;
+  int argc = 0;
+  for (c = strtok_r(file_name, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr))
+    argc++;
+  return argc;
 }
 
 /* A thread function that loads a user process and starts it
@@ -147,22 +124,22 @@ start_process (struct cArgs *c_args)
   struct thread *t = thread_current();
   struct intr_frame if_;
   bool success;
-  // bool tmp;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  tokenize(file_name);
+
+  int argc = calc_argc(file_name);
+  int fn_len = strlen (file_name);
+
   success = load (file_name, &if_.eip, &if_.esp);
 
   strlcpy (t->name, file_name, sizeof t->name);
   t->ps = c_args->ps;
   t->ps->pid = t->tid;
   list_init(&t->children);
-  // sema_init(&(t->ps)->ws, 0);
-
   init_cur_dir(t, c_args);
 
   free(c_args);
@@ -171,11 +148,7 @@ start_process (struct cArgs *c_args)
   if (!success)
     thread_finish(t, file_name);
 
-  //tokenize(file_name);
-  // if (!tokenize_status)
-  //   thread_finish(t, file_name);
-
-  int res = fill_args_in_stack((int *) &if_.esp, file_name);
+  int argv = fill_args_in_stack(file_name, fn_len, argc, (int *) &if_.esp);
   
   palloc_free_page (file_name);
   sema_up(&(t->ps->ws));
@@ -183,7 +156,7 @@ start_process (struct cArgs *c_args)
   if_.esp -= ((int) ((unsigned int) (if_.esp) % 16) + 8);
 
   if_.esp -= 8;
-  *((int *) (if_.esp + 4)) = res;
+  *((int *) (if_.esp + 4)) = argv;
   *((int *) (if_.esp)) = argc;
 
   if_.esp -= 4;
@@ -197,19 +170,6 @@ start_process (struct cArgs *c_args)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
-
-// void wait_status_helper(struct wait_status *ws) {
-//   lock_acquire(&ws->lock);
-//   ws->ref_cnt -= 1;
-//   if (ws->ref_cnt == 0) {
-//     lock_release(&ws->lock);
-//     list_remove(&ws->elem);
-//     // free(ws);
-//   } else {
-//     lock_release(&ws->lock);
-//   }
-// }
-
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -261,8 +221,7 @@ process_exit (void)
   ps->rc--;
   lock_release (&ps->rc_lock);
 
-  free_fds(cur);
-  free_children(cur);
+  free_thread_resource(cur);
 
   if (cur->ps->rc == 0)
     free(cur->ps);
@@ -291,35 +250,32 @@ process_exit (void)
   file_close(cur->exec_file);
 }
 
-
 void
-free_children (struct thread *cur)
-{
-  struct list *children = &cur->children;
-  for (struct list_elem *e = list_begin (children); e != list_end (children); e = list_next (e))
-    {
-      struct process_status *current_child = list_entry (e,
-                                                         struct process_status, elem);
-      if (current_child->rc == 1)
-        {
-          e = list_remove (&current_child->elem)->prev;
-          free (current_child);
-        }
+free_thread_resource(struct thread *cur_thread){
+  struct list *children = &cur_thread->children;
+  struct list *fd_list = &cur_thread->fd_list;
+  struct list_elem *cur = list_begin(children);
+  struct list_elem *last = list_end(children);
+  /* Free childs */
+  while (cur != last){
+    struct process_status *cur_child = list_entry (cur, struct process_status, elem);
+    if (cur_child->rc == 1){
+      cur = list_remove(&cur_child->elem)->prev;
+      free(cur_child);
     }
-}
+    cur = list_next(cur);
+  }
+  cur = list_begin(fd_list);
+  last = list_end(fd_list);
+  /* Free file descriptors */
+  while (cur != last) {
+    struct file_descriptor *cur_fd = list_entry(cur, struct file_descriptor, elem);
+    cur = list_remove(&cur_fd->elem)->prev;
+    file_close(cur_fd->file);
+    free(cur_fd);
+    cur = list_next(cur);
+  }
 
-void
-free_fds (struct thread *cur)
-{
-  struct list *fd_list = &cur->fd_list;
-  for (struct list_elem *e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e))
-    {
-      struct file_descriptor *fd = list_entry (e,
-                                               struct file_descriptor, elem);
-      e = list_remove (&fd->elem)->prev;
-      file_close (fd->file);
-      free (fd);
-    }
 }
 
 
@@ -428,20 +384,6 @@ load (char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  /* Fill argc and argv. */
-  // if (!tokenize(file_name))
-  //   {
-  //     printf ("load: %s: cannot tokenize\n", file_name);
-  //     goto done;
-  //   }
-  // if (argc < 1)
-  //   {
-  //     printf("load: cannot run program with no args.\n");
-  //     goto done;
-  //   }
-
-  // memcpy(thread_current()->name, argv[0], 15);
-  // thread_current()->name[15] = '\0';
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL)
@@ -651,10 +593,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Adds arguments and corresponding argc and argv to stack and
  * decreases esp. */
 int
-fill_args_in_stack (int *esp, char *fn)
+fill_args_in_stack (char *fn, int fn_len, int argc, int *esp)
 {
   /* pushing cmd's content */
-  int fn_len = strlen(fn);
+  // int fn_len = strlen(fn);
   *esp -= fn_len + 1;
   memcpy ((void *) *esp, fn, fn_len + 1);
   int argv_offset = *esp;

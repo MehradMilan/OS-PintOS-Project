@@ -19,6 +19,4 @@ struct process_status
     struct list_elem elem;                  /* Stored in parent thread. */
   };
 
-struct process_status *find_child (struct thread *, tid_t);
-
 #endif /* userprog/process.h */
