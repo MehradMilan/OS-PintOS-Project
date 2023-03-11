@@ -131,7 +131,7 @@ sys_write (int fd_num, const char *buffer, unsigned size)
 }
 
 int
-sys_create(const char* name, off_t initial_size)
+sys_create(const char* name, unsigned initial_size)
 {
   char * ptr; 
   for (ptr = name ; validate_addr (ptr) && *ptr != '\0'; ++ptr);
