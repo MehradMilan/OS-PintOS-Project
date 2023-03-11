@@ -87,9 +87,10 @@ sys_open (const char *name)
     new_fd->fd = fd_num ;
     cur->fd_count += 1;
     list_push_back(&cur->fd_list, &new_fd->elem);
-    return fd_num ; 
+    return fd_num; 
   }
 }
+
 
 int
 sys_close (int fdnum) 
@@ -124,8 +125,7 @@ sys_write (int fd_num, const char *buffer, unsigned size)
     struct file *f = f_descriptor->file; 
     if (!f)
       return -1;
-    struct inode *inode = file_get_inode(f);
-    if (!inode) bytes_written = file_write (f, buffer, size);
+    bytes_written = file_write (f, buffer, size);
   }
   return bytes_written;
 }
@@ -263,13 +263,13 @@ syscall_handler (struct intr_frame *f UNUSED)
     validate_args(f->esp, 3);
     validate_addr(args[2]);
     f->eax = sys_read(args[1], args[2], args[3]);
-  } /*else if (args[0] == SYS_EXEC) {
+  } else if (args[0] == SYS_EXEC) {
     validate_args(f->esp, 1);
     validate_addr(args[1]);
     f->eax = sys_exec(args[1]);
   } else if (args[0] == SYS_WAIT) {
     validate_args(f->esp, 1);
     f->eax = sys_wait((tid_t) args[1]);
-  }*/
+  }
 
 }
