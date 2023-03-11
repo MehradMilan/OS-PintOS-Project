@@ -10,6 +10,7 @@
 #include "threads/vaddr.h"
 #include <string.h>
 #include "devices/shutdown.h"
+#include "userprog/process.h"
 
 #define MAX_SYSCALL_ARGUMENTS 10
 #define MAX_NAME_SIZE 14
@@ -30,7 +31,9 @@ void
 sys_exit (int status)
 {
   struct thread *cur = thread_current();
-  printf ("%s: exit(%d)\n", (char *) &cur->name, status);
+  printf ("%s: exit(%d)\n", &cur->name, status);
+  cur->ps->exit_code = status;
+  cur->ps->is_exited = 1;
   thread_exit();
 }
 
@@ -227,7 +230,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (args[0] == SYS_EXIT) {
     validate_args(f->esp, 1);
     f->eax = args[1];
-    printf ("%s: exit(%d)\n", &thread_current()->name, args[1]);
+    struct thread *cur = thread_current();
+    printf ("%s: exit(%d)\n", &cur->name, args[1]);
+    cur->ps->exit_code = args[1];
+    cur->ps->is_exited = 1;
     thread_exit();
   } else if (args[0] == SYS_WRITE) {
     validate_args (f->esp, 3);
