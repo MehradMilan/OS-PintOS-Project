@@ -83,7 +83,7 @@ process_execute (const char *file_name)
   ps->is_exited = false;
 
   struct thread *t = thread_current();
-  list_push_back (&(t->children), &ps->children_elem);
+  list_push_back (&(t->children), &ps->elem);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -110,7 +110,7 @@ process_execute (const char *file_name)
   sema_down(&ps->ws);
 
   if (ps->exit_code != 0 && ps->is_exited){
-    list_remove(&ps->children_elem);
+    list_remove(&ps->elem);
     free(ps);
     return -1;
   }
@@ -210,22 +210,6 @@ start_process (struct cArgs *c_args)
 //   }
 // }
 
-struct process_status *
-find_child (struct thread *t, tid_t child_tid)
-{
-  struct process_status *result = NULL;
-  struct list *children = &t->children;
-  for (struct list_elem *e = list_begin (children); e != list_end (children); e = list_next (e))
-    {
-      struct process_status *current_child = list_entry (e, struct process_status, children_elem);
-      if (current_child->pid == child_tid)
-        {
-          result = current_child;
-          break;
-        }
-    }
-  return result;
-}
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -239,17 +223,29 @@ find_child (struct thread *t, tid_t child_tid)
 int
 process_wait (tid_t child_tid)
 {
-  struct process_status *child = find_child(thread_current(), child_tid);
+  struct thread *thread_cur = thread_current();
+  struct list_elem *cur = list_begin(&thread_cur->children);
+  struct list_elem *last = list_end(&thread_cur->children);
+  struct process_status *child_ps = NULL;
 
-  if (child == NULL)
+  while (cur != last){
+    struct process_status *child = list_entry(cur, struct process_status, elem);
+    if (child->pid == child_tid){
+      child_ps = child;
+      break;
+    }
+    child = list_next(child);
+  }
+
+  if (child_ps == NULL)
     return -1;
 
-  sema_down (&child->ws);
-  list_remove(&child->children_elem);
-  int res = child->exit_code;
-  free(child);
+  sema_down (&child_ps->ws);
+  list_remove(&child_ps->elem);
+  int ec = child_ps->exit_code;
+  free(child_ps);
 
-  return res;
+  return ec;
 }
 
 /* Free the current process's resources. */
@@ -303,10 +299,10 @@ free_children (struct thread *cur)
   for (struct list_elem *e = list_begin (children); e != list_end (children); e = list_next (e))
     {
       struct process_status *current_child = list_entry (e,
-                                                         struct process_status, children_elem);
+                                                         struct process_status, elem);
       if (current_child->rc == 1)
         {
-          e = list_remove (&current_child->children_elem)->prev;
+          e = list_remove (&current_child->elem)->prev;
           free (current_child);
         }
     }
