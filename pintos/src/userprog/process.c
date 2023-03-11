@@ -25,40 +25,11 @@
 #define MAX_ARGUMENT_LENGTH  1024
 #define ARGUMENT_DELIMITER   " "
 
-static char* argv[MAX_ARGUMENTS];
 static char* addrs[MAX_ARGUMENTS];
-static int argc;
-static bool tokenize(char* cmd_line);
 
 static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
-
-/* Tokenizes the input and sets argc and argv variables accordingly.
- * returns true on sucess, and false otherwise. */
-bool
-tokenize(char* cmd_line)
-{
-  char *c;
-
-  /* Initialize argv and argc */
-  for (argc = 0; argc < MAX_ARGUMENTS; ++ argc)
-    argv[argc] = NULL;  /* empty argv */
-  argc = 0;
-
-  /* Tokenizing the input */
-  char* strtok_saveptr;
-  for (c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr)) {
-      argv[argc] = c;
-      argc++;
-    }
-
-  /* Return false if argv is left. */
-  if (strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr) != NULL)
-    return false;
-
-  return true;
-}
 
 
 void
@@ -99,7 +70,6 @@ process_execute (const char *file_name)
   c_args->success = false;
   c_args->ps = ps;
   
-
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, c_args);
   if (tid == TID_ERROR){
@@ -147,21 +117,26 @@ start_process (struct cArgs *c_args)
   struct thread *t = thread_current();
   struct intr_frame if_;
   bool success;
-  // bool tmp;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  tokenize(file_name);
+
+  int argc = 0;
+  int fn_len = strlen (file_name);
+  // /* putting \0 at the end of each word and calculating argc */
+  char *token, *save_ptr;
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr))
+    argc++;
   success = load (file_name, &if_.eip, &if_.esp);
 
   strlcpy (t->name, file_name, sizeof t->name);
   t->ps = c_args->ps;
   t->ps->pid = t->tid;
   list_init(&t->children);
-  // sema_init(&(t->ps)->ws, 0);
 
   init_cur_dir(t, c_args);
 
@@ -175,7 +150,7 @@ start_process (struct cArgs *c_args)
   // if (!tokenize_status)
   //   thread_finish(t, file_name);
 
-  int res = fill_args_in_stack((int *) &if_.esp, file_name);
+  int argv = fill_args_in_stack(file_name, fn_len, argc, (int *) &if_.esp);
   
   palloc_free_page (file_name);
   sema_up(&(t->ps->ws));
@@ -183,7 +158,7 @@ start_process (struct cArgs *c_args)
   if_.esp -= ((int) ((unsigned int) (if_.esp) % 16) + 8);
 
   if_.esp -= 8;
-  *((int *) (if_.esp + 4)) = res;
+  *((int *) (if_.esp + 4)) = argv;
   *((int *) (if_.esp)) = argc;
 
   if_.esp -= 4;
@@ -197,18 +172,6 @@ start_process (struct cArgs *c_args)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
-
-// void wait_status_helper(struct wait_status *ws) {
-//   lock_acquire(&ws->lock);
-//   ws->ref_cnt -= 1;
-//   if (ws->ref_cnt == 0) {
-//     lock_release(&ws->lock);
-//     list_remove(&ws->elem);
-//     // free(ws);
-//   } else {
-//     lock_release(&ws->lock);
-//   }
-// }
 
 struct process_status *
 find_child (struct thread *t, tid_t child_tid)
@@ -655,10 +618,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Adds arguments and corresponding argc and argv to stack and
  * decreases esp. */
 int
-fill_args_in_stack (int *esp, char *fn)
+fill_args_in_stack (char *fn, int fn_len, int argc, int *esp)
 {
   /* pushing cmd's content */
-  int fn_len = strlen(fn);
+  // int fn_len = strlen(fn);
   *esp -= fn_len + 1;
   memcpy ((void *) *esp, fn, fn_len + 1);
   int argv_offset = *esp;
