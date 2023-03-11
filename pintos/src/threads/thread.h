@@ -10,10 +10,10 @@
 /* File descriptor */
 struct file_descriptor 
   { 
-    int fd ; 
-    struct dir *dir ; 
-    struct file *file ; 
-    struct list_elem elem;
+    int fd ;                  /* File descriptor identifier */
+    struct dir *dir ;         /* Related file directory */
+    struct file *file ;       /* File that fd points at */
+    struct list_elem elem;    /* Add or remove to list */
   };
 
 /* States in a thread's life cycle. */
@@ -91,21 +91,12 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-struct wait_status {
-  struct list_elem elem;            /* 'children' list element. */
-  struct lock lock;                 /* Protects ref_cnt. */
-  int ref_cnt;                      /* 2 = child and parent both alive, 1 = either child or parent alive,  */    
-  tid_t child_tid;                        /* Child thread id. */
-  int exit_code;                    /* Child exit code, if dead. */
-  struct semaphore sema;            /* 0 = child alive, 1 = child dead. */
-};
 
 struct cArgs {
-  char *file_name;
-  struct thread *parent;
-  struct dir *cur_dir;
-  bool success;
-  struct process_status *ps;
+  char *file_name;            /* File name */
+  struct thread *parent;      /* Parent thread for process */
+  struct dir *cur_dir;        /* Directory that process runs in */
+  struct process_status *ps;  /* Current process status */
 };
 
 struct thread
@@ -118,38 +109,23 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    struct list_elem elem;              /* List element. */
-    struct dir *working_dir;
-    struct process_status *ps;
-    struct list children;
-    struct list fd_list;
-    int fd_count;
-    struct file *exec_file;
-
-    // struct list fd_list;
-
-    // int fd_count; 
+    struct list_elem elem;              
+    struct dir *working_dir;            /* Current directory of thread */
+    struct process_status *ps;          /* Process status of child */
+    struct list children;               /* Child process of thread. */
+    struct list fd_list;                /* List of file decriptors */
+    int fd_count;                       /* Number of thread  file descriptors */
+    struct file *exec_file;             /* File which thread executes */
    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    // int exit_code;                      /* The exit code set when the thread completes */
-    // struct wait_status *wait_st;        /* The wait status of the thread */
-    // struct list children;               /* List of wait_status's of children */
-    
-    // struct list file_table;             /* List of file_entry's for thread. */
-    // int fd_count;                       /* Current file descriptor number for file_table. */
-    // struct file* exec_file;             /* Current executing file. */
+
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    // struct wait_status wait_status_entry;
-    // struct wait_status *wait_status;    
-    // struct list children;               
-    // bool load_success;                  
-    // struct semaphore child_load_sema; /* Semaphore to make sure child has finished loading */
   };
 
 /* If false (default), use round-robin scheduler.
@@ -187,7 +163,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-/* init function for wait_status struct. */
-// void wait_status_init (struct wait_status *, tid_t tid);
-struct thread *find_thread (tid_t);
+// struct thread *find_thread (tid_t);
 #endif /* threads/thread.h */
