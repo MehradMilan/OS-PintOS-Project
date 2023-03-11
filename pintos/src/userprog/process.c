@@ -50,7 +50,6 @@ tokenize(char* cmd_line)
   char* strtok_saveptr;
   for (c = strtok_r(cmd_line, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr)) {
       argv[argc] = c;
-      // addrs[argc] = &argv[argc];
       argc++;
     }
 
@@ -75,7 +74,6 @@ free_on_error(struct process_status *ps, char *file_cp){
 tid_t
 process_execute (const char *file_name)
 {
-  char *fn_copy;
   tid_t tid;
 
   struct process_status *ps = malloc (sizeof (struct process_status));
@@ -89,13 +87,13 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  char *fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
   struct cArgs *c_args = malloc(sizeof(struct cArgs));
-  c_args->file_name = file_name;
+  c_args->file_name = fn_copy;
   c_args->parent = t;
   c_args->cur_dir = t->working_dir;
   c_args->success = false;
@@ -126,7 +124,6 @@ init_cur_dir(struct thread *t, struct cArgs *c_args){
     t->working_dir = dir_reopen(c_args->cur_dir);
   else
     t->working_dir = dir_open_root();
-
 }
 
 void
