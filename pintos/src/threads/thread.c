@@ -597,22 +597,22 @@ void init_thread_ (struct thread *t){
 }
 
 
-struct thread
-*find_thread (tid_t t_id){
-  struct thread *t;
-  struct thread *res = NULL;
-  struct list_elem *e = list_head(&all_list);
-  while ((e = list_next(e)) != list_end(&all_list)) {
-    t = list_entry (e,
-      struct thread, allelem);
-    if (t->tid == t_id && t->status != THREAD_DYING) {
-      res = list_entry (e,
-      struct thread, allelem);
-      break;
-    }
-  }
-  return res;
-}
+// struct thread
+// *find_thread (tid_t t_id){
+//   struct thread *t;
+//   struct thread *res = NULL;
+//   struct list_elem *e = list_head(&all_list);
+//   while ((e = list_next(e)) != list_end(&all_list)) {
+//     t = list_entry (e,
+//       struct thread, allelem);
+//     if (t->tid == t_id && t->status != THREAD_DYING) {
+//       res = list_entry (e,
+//       struct thread, allelem);
+//       break;
+//     }
+//   }
+//   return res;
+// }
 
 
 /* Offset of `stack' member within `struct thread'.
