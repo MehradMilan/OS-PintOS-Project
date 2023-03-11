@@ -18,7 +18,7 @@ static void syscall_handler (struct intr_frame *);
 
 void sys_exit (int status);
 int sys_write (int fd_num, const char *buffer, unsigned size);
-int sys_create (const char* name, off_t initial_size);
+int sys_create (const char* name, unsigned initial_size);
 
 void
 syscall_init (void)
@@ -140,7 +140,7 @@ sys_create(const char* name, unsigned initial_size)
   else if (strlen(name) > MAX_NAME_SIZE)
      return 0;
   else {
-    return filesys_create(name, initial_size, false);
+    return filesys_create(name, initial_size);
   }
 }
 
