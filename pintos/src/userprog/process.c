@@ -157,14 +157,14 @@ start_process (struct cArgs *c_args)
   palloc_free_page (file_name);
   sema_up(&(t->ps->ws));
 
-  if_.esp -= ((int) ((unsigned int) (if_.esp) % 16) + 8);
+/*  if_.esp -= ((int) ((unsigned int) (if_.esp) % 16) + 8);
 
   if_.esp -= 8;
   *((int *) (if_.esp + 4)) = argv;
   *((int *) (if_.esp)) = argc;
 
   if_.esp -= 4;
-
+*/
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -634,7 +634,15 @@ fill_args_in_stack (char *fn, int fn_len, int argc, int *esp)
     }
 
   *esp -= 4 * (argc);
-  return *esp;
+  int tmp = *esp;
+
+  *esp -= ((int) ((unsigned int) (*esp) % 16) + 8);
+  *esp -= 8;
+
+  *((int *) (*esp + 4)) = tmp;
+  *((int *) (*esp)) = argc;
+
+  *esp -= 4;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
