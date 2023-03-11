@@ -255,10 +255,13 @@ free_thread_resource(struct thread *cur_thread){
   /* Free childs */
   while (cur != last){
     struct process_status *cur_child = list_entry (cur, struct process_status, elem);
+    /* Check child lock */
     if (cur_child->rc == 1){
+      /* free resources */
       cur = list_remove(&cur_child->elem)->prev;
       free(cur_child);
     }
+    /* move to net one */
     cur = list_next(cur);
   }
   cur = list_begin(fd_list);
@@ -266,9 +269,11 @@ free_thread_resource(struct thread *cur_thread){
   /* Free file descriptors */
   while (cur != last) {
     struct file_descriptor *cur_fd = list_entry(cur, struct file_descriptor, elem);
+    /* free resources */
     cur = list_remove(&cur_fd->elem)->prev;
     file_close(cur_fd->file);
     free(cur_fd);
+    /* move to net one */
     cur = list_next(cur);
   }
 
@@ -474,7 +479,6 @@ load (char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  // file_close (file);
   return success;
 }
 
