@@ -8,6 +8,16 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+/* File descriptor */
+struct file_descriptor 
+  { 
+    int fd ; 
+    struct dir *dir ; 
+    struct file *file ; 
+    struct list_elem elem;
+  };
+
+
 struct process_status	
   {	
     int pid;	
