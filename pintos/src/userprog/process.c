@@ -600,48 +600,48 @@ int
 fill_args_in_stack (char *fn, int fn_len, int argc, int *esp)
 {
   /* pushing cmd's content */
-  // int fn_len = strlen(fn);
   *esp -= fn_len + 1;
-  memcpy ((void *) *esp, fn, fn_len + 1);
-  int argv_offset = *esp;
+  memcpy (*esp, fn, fn_len + 1);
+  int argv_cur_possition = *esp;
 
   /* stack align */
   int align_size = ((unsigned int) *esp) % 4;
   *esp -= align_size;
-  memset ((void *) *esp, 0xff, align_size);
+  memset (*esp, 0, align_size);
 
-  /* argv[argc+1]=NULL; */
+  /* argv[argc+1] */
   *esp -= 4;
-  memset ((void *) *esp, 0, 4);
+  memset (*esp, 0, 4);
 
   /* pushing argv */
   *esp -= 4 * argc;
   const char *arg = fn;
   for (int i = 0; i < argc; i++)
     {
-      /* trimming args */
       int i = 0;
-      while (*(arg + i) == 0 || *(arg + i) == ' ')
-        i++;
+      for(i = 0; *(arg + i) == 0 || *(arg + i) == ' '; i++){}
       arg += i;
-      argv_offset += i;
+      argv_cur_possition += i;
 
-      /* pushing the current argv and moving to the next one */
-      *((int *) (*esp)) = argv_offset;
-      argv_offset += strlen (arg) + 1;
-      arg += strlen (arg) + 1;
+      *((int *) (*esp)) = argv_cur_possition;
+      argv_cur_possition += strlen (arg) + 1;
       *esp += 4;
+      arg += strlen (arg) + 1;
     }
 
+  /* take space back */
   *esp -= 4 * (argc);
   int tmp = *esp;
 
+  /* stack align */
   *esp -= ((int) ((unsigned int) (*esp) % 16) + 8);
-  *esp -= 8;
 
+  /* push argc */
+  *esp -= 8;
   *((int *) (*esp + 4)) = tmp;
   *((int *) (*esp)) = argc;
 
+  /* return address */
   *esp -= 4;
 }
 
