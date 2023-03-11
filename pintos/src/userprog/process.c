@@ -67,7 +67,6 @@ process_execute (const char *file_name)
   c_args->file_name = fn_copy;
   c_args->parent = t;
   c_args->cur_dir = t->working_dir;
-  // c_args->success = false;
   c_args->ps = ps;
   
   /* Create a new thread to execute FILE_NAME. */
@@ -100,12 +99,20 @@ void
 thread_finish(struct thread *t, char *fn){
   t->ps->exit_code = -1;
   t->ps->is_exited = true;
-  
   sema_up(&(t->ps->ws));
-  /* If load failed, quit. */
   palloc_free_page (fn);
 
   thread_exit();
+}
+
+int
+calc_argc(char *file_name){
+  char *c;
+  char *strtok_saveptr;
+  int argc = 0;
+  for (c = strtok_r(file_name, ARGUMENT_DELIMITER, &strtok_saveptr); c != NULL; c = strtok_r(NULL, ARGUMENT_DELIMITER, &strtok_saveptr))
+    argc++;
+  return argc;
 }
 
 /* A thread function that loads a user process and starts it
@@ -124,20 +131,15 @@ start_process (struct cArgs *c_args)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  int argc = 0;
+  int argc = calc_argc(file_name);
   int fn_len = strlen (file_name);
-  // /* putting \0 at the end of each word and calculating argc */
-  char *token, *save_ptr;
-  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr))
-    argc++;
+
   success = load (file_name, &if_.eip, &if_.esp);
 
   strlcpy (t->name, file_name, sizeof t->name);
   t->ps = c_args->ps;
   t->ps->pid = t->tid;
   list_init(&t->children);
-
   init_cur_dir(t, c_args);
 
   free(c_args);
@@ -145,10 +147,6 @@ start_process (struct cArgs *c_args)
   /* set load status */
   if (!success)
     thread_finish(t, file_name);
-
-  //tokenize(file_name);
-  // if (!tokenize_status)
-  //   thread_finish(t, file_name);
 
   int argv = fill_args_in_stack(file_name, fn_len, argc, (int *) &if_.esp);
   
@@ -172,19 +170,6 @@ start_process (struct cArgs *c_args)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
-
-// void wait_status_helper(struct wait_status *ws) {
-//   lock_acquire(&ws->lock);
-//   ws->ref_cnt -= 1;
-//   if (ws->ref_cnt == 0) {
-//     lock_release(&ws->lock);
-//     list_remove(&ws->elem);
-//     // free(ws);
-//   } else {
-//     lock_release(&ws->lock);
-//   }
-// }
-
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -236,8 +221,7 @@ process_exit (void)
   ps->rc--;
   lock_release (&ps->rc_lock);
 
-  free_fds(cur);
-  free_children(cur);
+  free_thread_resource(cur);
 
   if (cur->ps->rc == 0)
     free(cur->ps);
@@ -266,35 +250,32 @@ process_exit (void)
   file_close(cur->exec_file);
 }
 
-
 void
-free_children (struct thread *cur)
-{
-  struct list *children = &cur->children;
-  for (struct list_elem *e = list_begin (children); e != list_end (children); e = list_next (e))
-    {
-      struct process_status *current_child = list_entry (e,
-                                                         struct process_status, elem);
-      if (current_child->rc == 1)
-        {
-          e = list_remove (&current_child->elem)->prev;
-          free (current_child);
-        }
+free_thread_resource(struct thread *cur_thread){
+  struct list *children = &cur_thread->children;
+  struct list *fd_list = &cur_thread->fd_list;
+  struct list_elem *cur = list_begin(children);
+  struct list_elem *last = list_end(children);
+  /* Free childs */
+  while (cur != last){
+    struct process_status *cur_child = list_entry (cur, struct process_status, elem);
+    if (cur_child->rc == 1){
+      cur = list_remove(&cur_child->elem)->prev;
+      free(cur_child);
     }
-}
+    cur = list_next(cur);
+  }
+  cur = list_begin(fd_list);
+  last = list_end(fd_list);
+  /* Free file descriptors */
+  while (cur != last) {
+    struct file_descriptor *cur_fd = list_entry(cur, struct file_descriptor, elem);
+    cur = list_remove(&cur_fd->elem)->prev;
+    file_close(cur_fd->file);
+    free(cur_fd);
+    cur = list_next(cur);
+  }
 
-void
-free_fds (struct thread *cur)
-{
-  struct list *fd_list = &cur->fd_list;
-  for (struct list_elem *e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e))
-    {
-      struct file_descriptor *fd = list_entry (e,
-                                               struct file_descriptor, elem);
-      e = list_remove (&fd->elem)->prev;
-      file_close (fd->file);
-      free (fd);
-    }
 }
 
 
