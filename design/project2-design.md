@@ -31,7 +31,6 @@ struct list already_slept;       // List of threads that already slept
 
 struct lock sleep_thread_lock;   // Used for already_slept thread and making it thread-safe
 
-int64_t time_ticks;              // Used for wakeing thread up (ticks since OS booting)
 ```
 
 ```c
@@ -42,6 +41,8 @@ struct thread
   ...
 
   struct list_elem slept_thread; // Used for dealing with `already_slept` list.
+  
+  int64_t time_ticks;              // Used for wakeing thread up (ticks since OS booting)
 
   ...
 };
