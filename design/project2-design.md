@@ -8,7 +8,7 @@
 
 محمدحسین علی‌حسینی alihosseini@sharif.edu 
 
-مهراد میلانلو mehrad_milanloo@yahoo.com
+مهراد میلانلو milanloomehrad@gmail.com
 
 پرنیان رضوی‌پور razaviparnian81@yahoo.com
 
@@ -171,11 +171,142 @@ struct lock {
 
 >> پرسش هشتم: در کلاس سه صفت مهم ریسه‌ها که سیستم عامل هنگامی که ریسه درحال اجرا نیست را ذخیره می‌کند، بررسی کردیم:‍‍ `program counter` ، ‍‍‍`stack pointer` و `registers`. بررسی کنید که این سه کجا و چگونه در `Pintos` ذخیره می‌شوند؟ مطالعه ‍`switch.S` و تابع ‍`schedule` در فایل `thread.c` می‌تواند مفید باشد.
 
+In the ‍`schedule‍` function, a pointer to the thread that is currently running (`running_thread`) and a pointer to the next thread to be executed (`next_thread_to_run`) are defined. Then it is checked whether the next thread is the same as the current thread or not; If 
+they are different, the `switch_threads` function is called, in which the registers are initially saved on the stack using
+
+```assembly
+pushl %ebx
+pushl %ebp
+pushl %esi
+pushl %edi
+```
+
+These registers are called *callee-saved* registers and must be restored at the end.
+The `switch_threads` function saves these registers on the current thread's stack using `pushl` commands and restores them for the next thread using `popl` instructions.
+
+Saving the stack pointer:
+The global variable `thread_stack_ofs` is defined in `thread.c` as follows:
+```c
+uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+```
+We use this variable to access the offset of the stack pointer field in the `struct thread` and then load it into the `edx` register as follows:
+```8086
+mov thread_stack_ofs, %edx
+```
+**Note** that `SWITCH_CUR+esp` is the address of the current thread struct and `SWITCH_next+esp` is the address of the next thread struct.
+
+We have:
+```8086
+movl SWITCH_CUR(%esp), %eax
+movl %esp, (%eax,%edx,1)
+movl SWITCH_NEXT(%esp), %ecx
+movl (%ecx,%edx,1), %esp
+```
+
+What happens in these few lines is that the current `esp` is first stored in the stack field related to the current thread struct, and then the `esp`, which is a pointer to the top of the stack, is set to the value stored in the stack field of the next thread struct.
+Finally, the *callee-saved* registers are restored from the stack using
+```
+popl %edi
+popl %esi
+popl %ebp
+popl %ebx
+```
+
+**Note** that the address of the previous thread is stored in the `%eax` register and the function's output value is also stored in `%eax`. That's why in the schedule function, we have:
+```C
+prev = switch_threads (cur, next);
+```
+Which means that `prev` points to the same previous thread.
+
+
 >> پرسش نهم: وقتی یک ریسه‌ی هسته در ‍`Pintos` تابع `thread_exit` را صدا می‌زند، کجا و به چه ترتیبی صفحه شامل پشته و `TCB` یا `struct thread` آزاد می‌شود؟ چرا این حافظه را نمی‌توانیم به کمک صدازدن تابع ‍`palloc_free_page` داخل تابع ‍`thread_exit` آزاد کنیم؟
+
+In the `thread_exit` function, we have:
+```C
+list_remove (&thread_current()->allelem);
+thread_current()->status = THREAD_DYING;
+```
+This means that the thread is removed from the list of all threads, and the status of that thread is changed to `THREAD_DYING`. Then, in the same `thread_exit` function, the `schedule` function is called, in which we have:
+
+```C
+if (cur != next)
+prev = switch_threads (cur, next);
+thread_schedule_tail (prev);
+```
+
+In this part, Firstly, it switches to the new thread with `switch_threads`, and then `thread_schedule_tail` is called on the previous thread whose work is finished.
+
+In the `thread_schedule_tail` function, we have:
+```C
+/* If the thread we switched from is dying, destroy its struct
+thread. This must happen late so that thread_exit() doesn't
+pull out the rug from under itself. (We don't free
+initial_thread because its memory was not obtained via
+palloc().) */
+if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
+{
+ASSERT (prev != cur);
+palloc_free_page (prev);
+}
+```
+This means that if the status of the thread is `THREAD_DYING` and it is the initial thread, it will be removed from **Kernel** memory. **Note** that in `thread_exit`, the status was changed to `THREAD_DYING`, so the space taken by this thread (the finished thread) is freed by `palloc_free_page` here. Also, note that the initial thread did not obtain its space through `palloc`, so it does not need to be freed. We could not free the space earlier in `thread_exit` because we needed the thread's structural information in the `schedule` function, and if we did this before calling the `schedule` function, it would be removed from **Kernel** memory.
 
 >> پرسش دهم: زمانی که تابع ‍`thread_tick` توسط `timer interrupt handler` صدا زده می‌شود، در کدام پشته اجرا می‌شود؟
 
+In PintOS, the ‍‍`timer_interrupt` function serves as the `timer interrupt handler` and is invoked when a timer interrupt occurs. As the system is handling an interrupt, it operates in kernel mode. When the thread_tick function is called by the timer interrupt handler, it executes on the **kernel stack** associated with the currently executing thread.
+
 >> پرسش یازدهم: یک پیاده‌سازی کاملا کاربردی و درست این پروژه را در نظر بگیرید که فقط یک مشکل درون تابع ‍`sema_up()` دارد. با توجه به نیازمندی‌های پروژه سمافورها(و سایر متغیرهای به‌هنگام‌سازی) باید ریسه‌های با اولویت بالاتر را بر ریسه‌های با اولویت پایین‌تر ترجیح دهند. با این حال پیاده‌سازی ریسه‌های با اولویت بالاتر را براساس اولویت مبنا `Base Priority` به جای اولویت موثر ‍`Effective Priority` انتخاب می‌کند. اساسا اهدای اولویت زمانی که سمافور تصمیم می‌گیرد که کدام ریسه رفع مسدودیت شود، تاثیر داده نمی‌شود. تستی طراحی کنید که وجود این باگ را اثبات کند. تست‌های `Pintos` شامل کد معمولی در سطح هسته (مانند متغیرها، فراخوانی توابع، جملات شرطی و ...) هستند و می‌توانند متن چاپ کنند و می‌توانیم متن چاپ شده را با خروجی مورد انتظار مقایسه کنیم و اگر متفاوت بودند، وجود مشکل در پیاده‌سازی اثبات می‌شود. شما باید توضیحی درباره این که تست چگونه کار می‌کند، خروجی مورد انتظار و خروجی واقعی آن فراهم کنید.
+
+Consider the pseudo-code below:
+```C
+Thread A (priority 1){
+    acquire Lock_1
+    create Thread B
+    create Thread C
+    create Thread D
+    print("A")
+    release Lock_1
+}
+
+Thread B (priority 2){
+    acquire Lock_2
+    acquire Lock_1
+    print("B")
+    release Lock_2
+    release Lock_1
+}
+
+Thread C (priority 3){
+    acquire Lock_1
+    print("C")
+    release Lock_1
+}
+
+Thread D (priority 4){
+    acquire Lock_2
+    print("D")
+    release Lock_2
+}
+```
+This pseudocode demonstrates a scenario where an incorrect implementation of `sema_up()` leads to an undesired order of thread execution. In the given pseudocode, there are four threads (A, B, C, D) with different base priorities (1, 2, 3, 4). Two locks (Lock_1 and Lock_2) are used in the code to synchronize access to shared resources.
+
+Initially, Thread A acquires Lock_1 and creates Threads B, C, and D. At this point, both Thread B and Thread C are waiting to acquire Lock_1, while Thread D is waiting to acquire Lock_2.
+
+Due to priority donation, Thread A's effective priority becomes 4 (the highest priority among the threads waiting for Lock_1), and Thread B's effective priority also becomes 4 (since it's waiting for both Lock_1 and Lock_2). The priority table at this point looks like this:
+
+```C
+
+Thread Name  Base Priority  Effective Priority
+Thread A          1              4
+Thread B          2              4
+Thread C          3              3
+Thread D          4              4
+
+```
+
+The correct behavior for `sema_up()` should be to unblock the thread with the highest effective priority. In this case, Thread B should be unblocked, as it has an effective priority of 4, which is higher than Thread C's effective priority of 3. The correct order of execution should be **`ABDC`**.
+
+However, due to the bug in the `sema_up()` function, it unblocks the thread with the highest base priority instead of the highest effective priority. As a result, Thread C gets unblocked, which has a higher base priority of 3 compared to Thread B's base priority of 2. This leads to an incorrect order of execution: **`ACBD`**.
 
 ## سوالات نظرسنجی
 
