@@ -8,13 +8,11 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
-#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
-#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -287,6 +285,7 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
+
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
@@ -465,17 +464,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  init_thread_(t);
-
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
-
-  // t->wait_status = &t->wait_status_entry;
-  // // t->wait_status = (struct wait_status *) malloc(sizeof(struct wait_status));
-  // wait_status_init(t->wait_status, t->tid);
-  // list_init(&t->children);
-  // sema_init(&t->child_load_sema, 0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -587,16 +578,7 @@ allocate_tid (void)
 
   return tid;
 }
-
-void init_thread_ (struct thread *t){
-  t->fd_count = 2;
-  memset (&(t->fd_list), 0, sizeof (struct list));
-  list_init (&t->fd_list);
-  memset (&(t->children), 0, sizeof (struct list));
-  list_init (&(t->children));
-}
-
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

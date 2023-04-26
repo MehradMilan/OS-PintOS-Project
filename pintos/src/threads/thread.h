@@ -7,15 +7,6 @@
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
 
-/* File descriptor */
-struct file_descriptor 
-  { 
-    int fd ;                  /* File descriptor identifier */
-    struct dir *dir ;         /* Related file directory */
-    struct file *file ;       /* File that fd points at */
-    struct list_elem elem;    /* Add or remove to list */
-  };
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -91,14 +82,6 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-
-struct cArgs {
-  char *file_name;            /* File name */
-  struct thread *parent;      /* Parent thread for process */
-  struct dir *cur_dir;        /* Directory that process runs in */
-  struct process_status *ps;  /* Current process status */
-};
-
 struct thread
   {
     /* Owned by thread.c. */
@@ -109,23 +92,16 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    struct list_elem elem;              
-    struct dir *working_dir;            /* Current directory of thread */
-    struct process_status *ps;          /* Process status of child */
-    struct list children;               /* Child process of thread. */
-    struct list fd_list;                /* List of file decriptors */
-    int fd_count;                       /* Number of thread  file descriptors */
-    struct file *exec_file;             /* File which thread executes */
-   
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-
   };
 
 /* If false (default), use round-robin scheduler.
@@ -139,7 +115,7 @@ void thread_start (void);
 void thread_tick (void);
 void thread_print_stats (void);
 
-typedef void thread_func (struct cArgs *c_args);
+typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
@@ -163,5 +139,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-// struct thread *find_thread (tid_t);
+
 #endif /* threads/thread.h */
