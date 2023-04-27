@@ -36,3 +36,43 @@ The function `thread_sleep()` saves the wake-up time in the current thread's str
 
 
 # وظیفه۲: زمان‌بند اولویت‌دار
+
+Main change in data structures is:
+
+```c
+struct semaphore_elem
+{
+    ...
+    int priority;      /* Priority of thread which holds this sema */
+    ...
+};
+```
+
+Also we have this before:
+
+```c
+struct thread {
+  ...
+  bool donated;       /* True if threads priority is donated */
+  ...
+}
+```
+
+We threat this like threads because it is needed for queuing threads in ready/slept lists.
+
+After many faliures in test, we find out that `thread_set_priority` function needs to be modified. Priority donation was not handled and we add this functionality to code.
+
+Duo to our research before getting our hands dirty, we do not have any significant change in comparison of designing :)
+
+
+# وظیفه۳: آزمایشگاه زمان‌بندی
+
+The complete documentation is available in `ShedLab`. 
+
+# مسئولیت هر فرد
+
+در فاز طراحی، هر ۴ نفر مشارکت و هم‌فکری داشتیم.
+
+در فاز پیاده‌سازی، وطیفه یک را مهراد میلانلو، وظیفه دو را محمدحسین علی‌حسینی و پرنیان رضوی‌پور تکمیل کردند.
+
+همچنین آزمایشگاه زمان‌بندی توسط علیرضا نوروزی انجام شد.
