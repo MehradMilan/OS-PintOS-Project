@@ -109,6 +109,20 @@ sema_try_down (struct semaphore *sema)
   return success;
 }
 
+
+static struct thread* sema_wakeup_thread(struct semaphore *sema)
+{
+  ASSERT(sema != NULL);
+
+  struct list_elem *lst = list_min(&sema->waiters, thread_priority_comparetor, NULL);
+  struct thread *t = list_entry(lst, struct thread, elem);
+  list_remove(lst);
+  thread_unblock(t);
+
+  return t;
+}
+
+
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -121,13 +135,11 @@ sema_up (struct semaphore *sema)
   enum intr_level old_level = intr_disable ();
   struct thread* t = NULL;
   if (!list_empty (&sema->waiters)) {
-    struct list_elem *lst = list_min(&sema->waiters, thread_priority_comparetor, NULL);
-    t = list_entry(lst, struct thread, elem);
-    list_remove(lst);
-    thread_unblock(t);
+     t = sema_wakeup_thread(sema);
   }
   sema->value++;
-  thread_yield ();
+  if (t != NULL)
+    thread_yield ();
   intr_set_level (old_level);
 }
 
@@ -193,18 +205,20 @@ lock_init (struct lock *lock)
   lock->priority = BASE_PRIORITY;
 }
 
-void nested_priority_check(struct thread* t, int depth){
-  if (depth <= 0 || !t->waiting_lock || !t->waiting_lock->holder) return;
-  
-  else if (t->priority > t->waiting_lock->priority) {
-      t->waiting_lock->holder->donated = true;
-      t->waiting_lock->priority = t->priority;
-      t->waiting_lock->holder->priority = t->priority;
-      thread_update_readylist (t->waiting_lock->holder);
-      nested_priority_check (t->waiting_lock->holder, depth - 1);
-    }
-  return;
+void update_thread_priority(struct thread *t, int new_priority) {
+  t->donated = true;
+  t->waiting_lock->priority = new_priority;
+  t->waiting_lock->holder->priority = new_priority;
+  thread_update_readylist(t->waiting_lock->holder);
 }
+
+void nested_priority_check(struct thread *t, int depth) {
+  if (depth > 0 && t->waiting_lock && t->waiting_lock->holder && t->priority > t->waiting_lock->priority) {
+    update_thread_priority(t, t->priority);
+    nested_priority_check(t->waiting_lock->holder, depth - 1);
+  }
+}
+
 
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
@@ -214,27 +228,34 @@ void nested_priority_check(struct thread* t, int depth){
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void
-lock_acquire (struct lock *lock)
-{
-  ASSERT (lock != NULL);
-  ASSERT (!intr_context ());
-  ASSERT (!lock_held_by_current_thread (lock));
 
-  enum intr_level old_level = intr_disable ();
-  struct thread *curr = thread_current ();
+void lock_pre_acquire(struct lock *lock, enum intr_level *old_level)
+{
+  ASSERT(lock != NULL);
+  ASSERT(!intr_context());
+  ASSERT(!lock_held_by_current_thread(lock));
+
+  *old_level = intr_disable();
+  struct thread *curr = thread_current();
   curr->waiting_lock = lock;
 
   int depth = MAX_NESTED_PRIORITY;
   nested_priority_check(curr, depth);
+}
 
-  sema_down (&lock->semaphore);
+void lock_acquire(struct lock *lock)
+{
+  enum intr_level old_level;
+  lock_pre_acquire(lock, &old_level);
+
+  sema_down(&lock->semaphore);
 
   lock->holder = thread_current();
   lock->holder->waiting_lock = NULL;
-  list_push_back (&lock->holder->acquired_locks, &lock->elem);
-  intr_set_level (old_level);
+  list_push_back(&lock->holder->acquired_locks, &lock->elem);
+  intr_set_level(old_level);
 }
+
 
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -262,40 +283,48 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
-void
-lock_release (struct lock *lock)
+void 
+lock_release(struct lock *lock)
 {
-  ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
+  ASSERT(lock != NULL);
+  ASSERT(lock_held_by_current_thread(lock));
 
-  struct thread *curr = thread_current ();
-  enum intr_level old_level = intr_disable ();
-
-  int current_thread_priority = curr->base_priority;
+  enum intr_level old_level = intr_disable();
   lock->holder = NULL;
+
+  update_lock_and_thread_priorities(lock);
+  
+  sema_up(&lock->semaphore);
+  intr_set_level(old_level);
+}
+
+struct lock *get_highest_priority_lock(struct list *acquired_locks)
+{
+  struct list_elem *elem = list_min(acquired_locks, lock_priority_comparetor, NULL);
+  return list_entry(elem, struct lock, elem);
+}
+
+void update_lock_and_thread_priorities(struct lock *lock)
+{
+  struct thread *curr = thread_current();
 
   list_remove(&lock->elem);
   lock->priority = BASE_PRIORITY;
-  if (list_empty(&curr->acquired_locks))
+
+  if (list_empty(&curr->acquired_locks)) {
     curr->donated = false;
-  else {
-    struct lock *lst = list_entry(list_min (&curr->acquired_locks, lock_priority_comparetor, NULL), struct lock, elem);
-    if (lst->priority != BASE_PRIORITY){
-      current_thread_priority = lst->priority;
-      curr->priority = current_thread_priority;
-      // curr->priority = current_thread_priority = lst->priority;
+    curr->priority = curr->base_priority;
+  } else {
+    struct lock *highest_priority_lock = get_highest_priority_lock(&curr->acquired_locks);
+
+    if (highest_priority_lock->priority != BASE_PRIORITY) {
+      curr->priority = highest_priority_lock->priority;
       curr->donated = true;
-      sema_up(&lock->semaphore);
-      intr_set_level (old_level);
-      return;
+    } else {
+      curr->priority = curr->base_priority;
+      curr->donated = false;
     }
   }
-  curr->priority = current_thread_priority;
-  curr->base_priority = current_thread_priority;
-  sema_up (&lock->semaphore);
-  intr_set_level (old_level);
-
-  // sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
