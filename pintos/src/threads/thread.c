@@ -37,6 +37,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* List of threads that already slept */
+static struct list already_slept;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
   {
@@ -70,6 +73,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+bool thread_comparable_time_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -92,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&already_slept);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -137,6 +142,8 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  if (!list_empty(&already_slept))
+    update_slept_threads ();
 }
 
 /* Prints thread statistics. */
@@ -582,3 +589,54 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void
+thread_sleep(int64_t ticks) {
+
+  struct thread *current_thread = thread_current();
+
+  enum intr_level old_level = intr_disable();
+
+  current_thread->time_ticks = ticks + timer_ticks();
+  list_insert_ordered (&already_slept, &current_thread->elem, thread_comparable_time_ticks, NULL);
+
+  thread_block ();
+
+  intr_set_level (old_level);
+}
+
+void
+update_slept_threads ()
+{
+  if (thread_ticks +1 >= TIME_SLICE)
+    intr_yield_on_return();
+  if (list_empty (&already_slept))
+    return;
+  struct list_elem* curr_elem = list_begin(&already_slept);
+  struct list_elem *next_elem;
+  struct thread *t;
+  while(curr_elem != list_end(&already_slept)) {
+    next_elem = list_next(curr_elem);
+    t = list_entry (curr_elem, struct thread, elem);
+    if (t->time_ticks <= timer_ticks()) {
+      enum intr_level old_level = intr_disable ();
+
+      list_remove (curr_elem);
+      thread_unblock (t);
+
+      intr_set_level (old_level);
+      curr_elem = next_elem;
+    } 
+    else 
+      break;
+  }
+
+}
+
+bool
+thread_comparable_time_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    struct thread* t1 = list_entry (elem1, struct thread, elem);
+    struct thread* t2 = list_entry (elem2, struct thread, elem);
+    return t1->time_ticks < t2->time_ticks;
+}
