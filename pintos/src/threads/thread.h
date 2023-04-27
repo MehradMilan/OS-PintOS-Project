@@ -26,6 +26,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+# define BASE_PRIORITY -1
+
+# define MAX_NESTED_PRIORITY 9
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -93,6 +97,11 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
   
    int64_t time_ticks;              // Used for wakeing thread up (ticks since OS booting)
+
+   int base_priority;         
+   bool donated;                   
+   struct list acquired_locks;          
+   struct lock *waiting_lock; 
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

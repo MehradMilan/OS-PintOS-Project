@@ -143,7 +143,7 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
   if (!list_empty(&already_slept))
-    update_slept_threads ();
+    return;
 }
 
 /* Prints thread statistics. */
@@ -208,7 +208,17 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  thread_yield();
+
   return tid;
+}
+
+bool
+thread_priority_compare (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    struct thread* t1 = list_entry (elem1, struct thread, elem);
+    struct thread* t2 = list_entry (elem2, struct thread, elem);
+    return t1->priority < t2->priority;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -244,7 +254,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -315,7 +325,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, thread_priority_compare, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -471,9 +481,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  old_level = intr_disable ();
+  t->time_ticks = -1;
+  t->base_priority = priority;
+  t->donated = false;
+  list_init(&t->acquired_locks);
+  t->waiting_lock = NULL; // todo: change lock
+
+  // old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-  intr_set_level (old_level);
+  // intr_set_level (old_level);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -631,6 +647,16 @@ update_slept_threads ()
       break;
   }
 
+}
+
+void
+thread_update_readylist (struct thread* t)
+{
+  if (t->status == THREAD_READY)
+   {
+     list_remove (&t->elem);
+     list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
+   } 
 }
 
 bool
