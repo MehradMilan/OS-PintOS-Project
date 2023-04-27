@@ -232,9 +232,7 @@ lock_acquire (struct lock *lock)
 
   lock->holder = thread_current();
   lock->holder->waiting_lock = NULL;
-  // curr->waiting_lock = NULL;
   list_push_back (&lock->holder->acquired_locks, &lock->elem);
-  // lock->holder->waiting_lock = NULL;
   intr_set_level (old_level);
 }
 
@@ -272,6 +270,7 @@ lock_release (struct lock *lock)
 
   struct thread *curr = thread_current ();
   enum intr_level old_level = intr_disable ();
+
   int current_thread_priority = curr->base_priority;
   lock->holder = NULL;
 

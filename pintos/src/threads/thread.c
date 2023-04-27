@@ -142,7 +142,7 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
   if (!list_empty(&already_slept))
-    return;
+    update_slept_threads();
 }
 
 /* Prints thread statistics. */
@@ -651,11 +651,10 @@ update_slept_threads ()
 void
 thread_update_readylist (struct thread* t)
 {
-  if (t->status == THREAD_READY)
-   {
-     list_remove (&t->elem);
-     list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
-   } 
+  if (t->status != THREAD_READY)
+    return;
+  list_remove (&t->elem);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
 }
 
 bool
