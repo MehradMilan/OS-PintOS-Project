@@ -34,24 +34,9 @@
 
 
 bool lock_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
-bool cond_compareby_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+bool cond_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
+bool thread_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 
-bool
-thread_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
-{
-    struct thread* t1 = list_entry (elem1, struct thread, elem);
-    struct thread* t2 = list_entry (elem2, struct thread, elem);
-    return t1->priority < t2->priority;
-}
-
-bool
-lock_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
-{
-  const struct lock *thread_1 = list_entry (elem1, struct lock, elem);
-  const struct lock *thread_2 = list_entry (elem2, struct lock, elem);
-
-  return thread_1->priority > thread_2->priority;
-}
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -212,13 +197,13 @@ void nested_priority_check(struct thread* t, int depth){
   if (depth <= 0 || !t->waiting_lock || !t->waiting_lock->holder) return;
   
   else if (t->priority > t->waiting_lock->priority) {
+      t->waiting_lock->holder->donated = true;
       t->waiting_lock->priority = t->priority;
       t->waiting_lock->holder->priority = t->priority;
-      t->waiting_lock->holder->donated = true;
       thread_update_readylist (t->waiting_lock->holder);
       nested_priority_check (t->waiting_lock->holder, depth - 1);
     }
-  else return;
+  return;
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -247,7 +232,7 @@ lock_acquire (struct lock *lock)
 
   lock->holder = thread_current();
   lock->holder->waiting_lock = NULL;
-  curr->waiting_lock = NULL;
+  // curr->waiting_lock = NULL;
   list_push_back (&lock->holder->acquired_locks, &lock->elem);
   // lock->holder->waiting_lock = NULL;
   intr_set_level (old_level);
@@ -297,20 +282,21 @@ lock_release (struct lock *lock)
   else {
     struct lock *lst = list_entry(list_min (&curr->acquired_locks, lock_priority_comparetor, NULL), struct lock, elem);
     if (lst->priority != BASE_PRIORITY){
-      // current_thread_priority = lst->priority;
-      // curr->priority = current_thread_priority;
-      curr->priority = current_thread_priority = lst->priority;
+      current_thread_priority = lst->priority;
+      curr->priority = current_thread_priority;
+      // curr->priority = current_thread_priority = lst->priority;
       curr->donated = true;
       sema_up(&lock->semaphore);
       intr_set_level (old_level);
       return;
     }
   }
-  curr->priority = curr->base_priority = current_thread_priority;
+  curr->priority = current_thread_priority;
+  curr->base_priority = current_thread_priority;
   sema_up (&lock->semaphore);
   intr_set_level (old_level);
 
-  sema_up (&lock->semaphore);
+  // sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -378,7 +364,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 
   sema_init (&waiter.semaphore, 0);
   waiter.priority = thread_current ()-> priority;
-  list_insert_ordered (&cond->waiters, &waiter.elem, cond_compareby_priority, NULL);
+  list_insert_ordered (&cond->waiters, &waiter.elem, cond_priority_comparetor, NULL);
   // list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);
@@ -421,10 +407,29 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
-bool cond_compareby_priority(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+bool
+cond_priority_comparetor(const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
   const struct semaphore_elem *s1 = list_entry (elem1, struct semaphore_elem, elem);
   const struct semaphore_elem *s2 = list_entry (elem2, struct semaphore_elem, elem);
 
   return s1->priority > s2->priority;
+}
+
+bool
+thread_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    struct thread* t1 = list_entry (elem1, struct thread, elem);
+    struct thread* t2 = list_entry (elem2, struct thread, elem);
+
+    return t1->priority > t2->priority;
+}
+
+bool
+lock_priority_comparetor (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+  const struct lock *thread_1 = list_entry (elem1, struct lock, elem);
+  const struct lock *thread_2 = list_entry (elem2, struct lock, elem);
+
+  return thread_1->priority > thread_2->priority;
 }

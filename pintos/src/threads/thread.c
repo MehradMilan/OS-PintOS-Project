@@ -73,7 +73,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool thread_comparable_time_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -213,14 +212,6 @@ thread_create (const char *name, int priority,
   return tid;
 }
 
-bool
-thread_priority_compare (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
-{
-    struct thread* t1 = list_entry (elem1, struct thread, elem);
-    struct thread* t2 = list_entry (elem2, struct thread, elem);
-    return t1->priority < t2->priority;
-}
-
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -352,7 +343,18 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
-  thread_current ()->priority = new_priority;
+  ASSERT (PRI_MIN <= new_priority && new_priority <= PRI_MAX);
+  enum intr_level old_level = intr_disable();
+  struct thread* current_thread = thread_current();
+
+  if (current_thread->donated && new_priority <= current_thread->priority)
+    current_thread->base_priority = new_priority;
+  else
+    current_thread->priority = current_thread->base_priority = new_priority;
+
+  thread_yield();
+
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -468,7 +470,6 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  enum intr_level old_level;
 
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
@@ -481,15 +482,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  t->time_ticks = -1;
+  t->time_ticks = 0;
   t->base_priority = priority;
   t->donated = false;
   list_init(&t->acquired_locks);
   t->waiting_lock = NULL; // todo: change lock
 
-  // old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-  // intr_set_level (old_level);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -614,7 +613,7 @@ thread_sleep(int64_t ticks) {
   enum intr_level old_level = intr_disable();
 
   current_thread->time_ticks = ticks + timer_ticks();
-  list_insert_ordered (&already_slept, &current_thread->elem, thread_comparable_time_ticks, NULL);
+  list_insert_ordered (&already_slept, &current_thread->elem, thread_time_ticks_compare, NULL);
 
   thread_block ();
 
@@ -660,9 +659,18 @@ thread_update_readylist (struct thread* t)
 }
 
 bool
-thread_comparable_time_ticks (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+thread_time_ticks_compare (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
     struct thread* t1 = list_entry (elem1, struct thread, elem);
     struct thread* t2 = list_entry (elem2, struct thread, elem);
     return t1->time_ticks < t2->time_ticks;
+}
+
+bool
+thread_priority_compare (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    struct thread* t1 = list_entry (elem1, struct thread, elem);
+    struct thread* t2 = list_entry (elem2, struct thread, elem);
+
+    return t1->priority > t2->priority;
 }
