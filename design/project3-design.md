@@ -175,6 +175,19 @@ In our implementation, a user process is not allowed to delete a directory if it
 
 To maintain the working directory and efficiently support related operations, we use the `struct dir` since it is not dependent on the name and requires no changes when the working directory name is altered. We have added `struct dir *cwd` to the `thread` data structure to specify the working directory of each thread. When resolving a relative address, we use the `dir_lookup()` function to navigate to the next section, ensuring efficient traversal of the directory tree.
 
+سوال افزون بر طراحی 
+============
+
+**write-behind**:
+
+میتوانیم یک timer interupt داشته باشیم که باعث شود ترد در هر مدت زمان مشخصی همه ی سکتور های dirty را به درون دیسک بنویسد و از طرفی با توجه با استراکی برای cache bolck تعریف کرده بودیم ، هر بلاک کش یک  لاک دارد که تایمر اینتراپت باید برای نوشته شدن آن بلاک در دیسک ، آن را آزاد کند و تا حین نوشتن آن بلاک درون دیسک ، ترد دیگری آن را نتواند تغییر دهد .
+
+
+**read-ahead**:
+
+یک window size دیفالت را درنظر میگیریم. هنگامی که میخواهیم read کنیم ، ابتدا طبق روال عادی چک میکنیم که آیا سکتور مورد نظر از قبل در بافر کش میباشد یا نه، اگر نبود باید از دیسک آن را بخوانیم. سکتور موردنظر را همراه با سکتور های قبل آن و بعد آن (‌به تعداد window size) میخوانیم و سپس همه ی سکتورهای خوانده شده را در بافر کش میگذاریم. حال مثلا یک تابع ایمپلینت میکنیم که با استفاده از track ای که از  عملیات‌های read داشتیم (به همراه شماره ی سکتور های مقصودشان) بررسی می‌کند که آیا سکتور ای که به‌تازگی آن را خوانیم باعث می‌شود که یک پترن sequential داشته باشیم یا خیر (با چک کردن حسابی بودن دنباله! یعنی مثلا سکتوری که به تازگی خواندیم x تا بعد سکتور قبلی و سکتور قبلی نیز x تا قبل سکتور قبلیش هست یا نه... )‌ . اگر تابع موردنظر true ریترن کرد (یعنی دنباله ی حسابی را تشخیص داد ) window size  را افزایش می‌دهیم. در غیر این صورت اگر پترن خاصی وجود نداشته و یک جورایی رندوم می‌باشد ،window size را کاهش می‌دهیم که سکتورهای غیرمفید را الکی نخوانیم و صرفه‌جویی شود.
+
+
 ### سوالات نظرسنجی
 
 پاسخ به این سوالات دلخواه است، اما به ما برای بهبود این درس در ادامه کمک خواهد کرد.
