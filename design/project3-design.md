@@ -148,20 +148,72 @@ $512 * (123 + 128 + 128 * 128) = 8517120$
 
 >>‫ در این قسمت تعریف هر یک از `struct` ها، اعضای `struct` ها، متغیرهای سراسری‫ یا ایستا، `typedef` ها یا `enum` هایی که ایجاد کرده‌اید یا تغییر داده‌اید را بنویسید و‫ دلیل هر کدام را در حداکثر ۲۵ کلمه توضیح دهید.
 
+We add a pointer to the working directory of `thread` in its struct. This way we can access to the `CWD` of each thread.
+
+`thread.h:`
+```C
+struct thread
+{
+	...
+    struct dir *cwd;
+	...
+}
+```
+We also add a bool variable to the `inode_disk` struct to determine whether an inode is containing a directory on the disk or not.
+
+`inode.c:`
+```C
+struct inode
+  {
+    ...
+	bool is_dir;
+	...
+  };
+```
+We add an `lock` for each directory. Also, we add `parent_dir` to the `struct dir`. Therefore we can access the parent directories easily by recursion. There is `use_cnt` parameter that shows number of processes that are using this directory.
+
+`directory.c:`
+```C
+struct dir
+  {
+    ...
+	struct dir *parent_dir;
+	int use_cnt;
+	struct lock *lock;
+	...
+  };
+```
+
+
 الگوریتم‌ها
 -----------
 
 >>‫ کد خود را برای طی کردن یک مسیر گرفته‌شده از کاربر را توضیح دهید.‫ آیا عبور از مسیرهای absolute و relative تفاوتی دارد؟
+
+To handle both **absolute** and **relative** paths, we start by determining the initial directory.
+
+If we have an absolute path, we use the `dir_open_root()` function provided by Pintos as the starting point (dir) and traverse the path with the `dir_lookup()` function.
+
+If the path is relative, we use the `cwd` defined in each `thread` as the starting point.
+
+In both cases, we use the `get_next_part()` method to obtain the name of the next part and continue recursively to find the corresponding `inode`.
+
 
 همگام سازی
 -------------
 
 >>‫ چگونه از رخ دادن race-condition در مورد دایرکتوری ها پیشگیری می‌کنید؟‫ برای مثال اگر دو درخواست موازی برای حذف یک فایل وجود داشته باشد و ‫ تنها یکی از آنها باید موفق شود یا مثلاً دو ریسه موازی بخواهند فایلی‫ یک اسم در یک مسیر ایجاد کنند و مانند آن.‫ آیا پیاده سازی شما اجازه می‌دهد مسیری که CWD یک ریسه شده یا پردازه‌ای‫ از آن استفاده می‌کند حذف شود؟ اگر بله، عملیات فایل سیستم بعدی روی آن‫ دایرکتوری چه نتیجه‌ای می‌دهند؟ اگر نه، چطور جلوی آن را می‌گیرید؟
 
+We have added a `lock` for each directory to ensure atomic access for any access to the same directory. Therefore each `thread` that wants to access an specified directory, should **acquire** its lock first.
+
+In our implementation, a user process is not allowed to delete a directory if it is the cwd of a running process. This can be ensured by checking `use_cnt` before deleting a directory.
+
 منطق طراحی
 -----------------
 
 >>‫ توضیح دهید چرا تصمیم گرفتید CWD یک پردازه را به شکلی که طراحی کرده‌اید‫ پیاده‌سازی کنید؟
+
+To maintain the working directory and efficiently support related operations, we use the `struct dir` since it is not dependent on the name and requires no changes when the working directory name is altered. We have added `struct dir *cwd` to the `thread` data structure to specify the working directory of each thread. When resolving a relative address, we use the `dir_lookup()` function to navigate to the next section, ensuring efficient traversal of the directory tree.
 
 ### سوالات نظرسنجی
 
