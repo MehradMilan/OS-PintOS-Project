@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "filesys/directory.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -143,7 +144,7 @@ sys_create(const char* name, unsigned initial_size)
   else if (strlen(name) > MAX_NAME_SIZE)
      return 0;
   else {
-    return filesys_create(name, initial_size);
+    return filesys_create(name, initial_size , false);
   }
 }
 
@@ -277,5 +278,107 @@ syscall_handler (struct intr_frame *f UNUSED)
     validate_args(f->esp, 1);
     f->eax = sys_wait((tid_t) args[1]);
   }
+  else if ( args[0] == SYS_MKDIR) {
+    sys_mkdir(f, (char *) args[1]);
+  } else if ( args[0] == SYS_ISDIR){
+    sys_isdir(f, args[1]); }
+  else if ( args[0] == SYS_READDIR) {
+    sys_readdir(f, args[1], (char *) args[2]);
+  } else if ( args[0] == SYS_CHDIR){
+    sys_chdir(f, (char *) args[1]);
+  }
+
 
 }
+
+
+
+
+//dir  
+
+
+
+void
+  sys_isdir (struct intr_frame *f, int fid) {
+  struct file_descriptor *descriptor = get_fd_by_num(fid);
+  if (descriptor != NULL) {
+    struct file *file = descriptor->file;
+
+    if (file != NULL) {
+      struct inode *inode = file_get_inode(file);
+      f->eax =  is_directory_inode(inode);
+    } else {
+      f->eax = -1;
+    }
+  } else {
+    f->eax = -1;
+  }
+}
+
+
+
+
+struct 
+dir* open_valid_directory(char *dir_name, struct intr_frame *f) {
+  if (!validate_addr(dir_name)) {
+    sys_exit(-1);
+    return NULL;
+  }
+
+  struct dir *new_dir = dir_open_path(dir_name);
+
+  return new_dir;
+}
+
+void 
+sys_chdir(struct intr_frame *f, char *dir_name) {
+  f->eax = false;
+  struct dir *new_dir = open_valid_directory(dir_name, f);
+  if (new_dir) {
+    struct thread *t = thread_current();
+    if (t->working_dir) {
+      dir_close(t->working_dir);
+    }
+    t->working_dir = new_dir;
+    f->eax = true;
+  }
+}
+
+
+
+
+
+
+void 
+sys_mkdir (struct intr_frame *f, char *dir_name)
+{
+    if (!validate_addr (dir_name))
+    sys_exit (-1);
+    else{
+      f->eax = filesys_create (dir_name, 0, true);
+    }
+}
+
+
+
+void 
+sys_readdir (struct intr_frame *f, int fid, char *name)
+{
+  if (!validate_addr (name)) {
+    sys_exit (-1);
+    return;
+  }
+
+  struct file_descriptor *fd = get_fd_by_num(fid);
+  f->eax = -1;
+  if (fd && fd->file) {
+    struct inode *inode = file_get_inode(fd->file);
+    if (inode && is_directory_inode(inode)) {
+      struct dir *dir = fd->dir;
+      if (dir) {
+        f->eax = dir_readdir(dir, name);
+      }
+    }
+  }
+}
+

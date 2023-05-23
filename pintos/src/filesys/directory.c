@@ -240,7 +240,7 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
-  else if (inode_is_dir (inode))
+  else if (is_directory_inode (inode))
     {
       struct dir *dir_remove = dir_open (inode);
       struct dir_entry e_remove;
