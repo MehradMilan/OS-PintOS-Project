@@ -11,7 +11,7 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 #define DIRECT_BLOCK_NO 123
-#define INDIRECT_BLOCK_NO BLOCK_SECTOR_SIZE/4
+#define INDIRECT_BLOCK_NO 128
 
 struct inode_disk *get_inode_disk (const struct inode *);
 static bool inode_disk_allocate (struct inode_disk *disk_inode, off_t length);
@@ -121,7 +121,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -134,7 +134,7 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-//      disk_inode->is_dir = is_dir;
+      disk_inode->is_dir = is_dir;
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
       if (inode_disk_allocate (disk_inode, length))
@@ -215,10 +215,10 @@ allocate_indirect(block_sector_t *sector_idx, size_t num_sectors_to_allocate)
 static bool
 allocate_sector (block_sector_t *sector_idx)
 {
-  static char buffer[BLOCK_SECTOR_SIZE];
+  static char new_buffer[BLOCK_SECTOR_SIZE];
   if (free_map_allocate(1, sector_idx))
     {
-      cache_write (fs_device, *sector_idx, buffer, 0, BLOCK_SECTOR_SIZE);
+      cache_write (fs_device, *sector_idx, new_buffer, 0, BLOCK_SECTOR_SIZE);
       return true;
     }
   return false;
