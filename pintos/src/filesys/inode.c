@@ -20,6 +20,11 @@ static bool inode_disk_allocate (struct inode_disk *disk_inode, off_t length);
 static bool allocate_sector (block_sector_t *sector_idx);
 static bool allocate_indirect(block_sector_t *sector_idx, size_t num_sectors_to_allocate);
 static bool inode_disk_deallocate (struct inode *inode);
+
+/* List of open inodes, so that opening a single inode twice
+   returns the same `struct inode'. */
+static struct list open_inodes;
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
