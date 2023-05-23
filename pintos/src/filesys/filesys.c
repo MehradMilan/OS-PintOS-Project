@@ -6,6 +6,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "filesys/cache.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -22,6 +23,7 @@ filesys_init (bool format)
     PANIC ("No file system device found, can't initialize file system.");
 
   inode_init ();
+  cache_init();
   free_map_init ();
 
   if (format)
@@ -36,8 +38,9 @@ void
 filesys_done (void)
 {
   free_map_close ();
+  cache_shutdown (fs_device);
 }
-
+
 /* Creates a file named NAME with the given INITIAL_SIZE.
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
@@ -64,22 +67,44 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 }
 
 /* Opens the file with the given NAME.
-   Returns the new file if successful or a null pointer
-   otherwise.
+   Puts the file/directory in the given `descriptor`.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  char directory[strlen(name) + 1];
+  char file_name[NAME_MAX + 1];
+  memset(directory, '\0', sizeof(directory));
+  memset(file_name, '\0', sizeof(file_name));
+
+  if (!split_path(name, directory, file_name)) {
+    return NULL;
+  }
+
+  struct dir *dir = dir_open_path(directory);
+  if (dir == NULL) {
+    return NULL;
+  }
+
   struct inode *inode = NULL;
+  if (strlen(file_name) == 0) {
+    inode = dir_get_inode(dir);
+  } else {
+    if (!dir_lookup(dir, file_name, &inode)) {
+      dir_close(dir);
+      return NULL;
+    }
+    dir_close(dir);
+  }
 
-  if (dir != NULL)
-    dir_lookup (dir, name, &inode);
-  dir_close (dir);
+  if (inode == NULL || inode_is_removed(inode)) {
+    return NULL;
+  }
 
-  return file_open (inode);
+  return file_open(inode);
 }
+
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.
@@ -94,7 +119,7 @@ filesys_remove (const char *name)
 
   return success;
 }
-
+
 /* Formats the file system. */
 static void
 do_format (void)

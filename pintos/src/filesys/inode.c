@@ -482,18 +482,22 @@ inode_disk_deallocate (struct inode *inode)
 }
 
 
-bool is_directory_inode (const struct inode *inode) {
-    if (!inode)
-        return false;
 
-    struct inode_disk *disk_inode = get_inode_disk(inode);
-    if (!disk_inode)
-        return false;
-
-    bool is_dir = disk_inode->is_dir;
-    free(disk_inode);
-
-    return is_dir;
+bool
+is_directory_inode (const struct inode *inode)
+{
+  struct inode_disk *disk_inode;
+  bool result = false;
+  
+  if (inode) {
+    disk_inode = get_inode_disk(inode);
+    if (disk_inode) {
+        result = disk_inode->is_dir;
+        free(disk_inode);
+    }
+  }
+  
+  return result;
 }
 
 bool
