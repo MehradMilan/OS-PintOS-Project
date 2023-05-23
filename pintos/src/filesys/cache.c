@@ -100,3 +100,14 @@ cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, o
 
   lock_release(&cb->cache_lock);
 }
+
+void
+cache_shutdown (struct block *fs_device)
+{
+  for (int i=0; i<CACHE_SIZE; i++)
+    {
+      if (cache[i].valid == true && cache[i].dirty == true)
+        flush_block (fs_device, &cache[i]);
+    }
+
+}

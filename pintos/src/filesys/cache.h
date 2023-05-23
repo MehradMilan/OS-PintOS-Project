@@ -36,5 +36,6 @@ void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buff
 void flush_block (struct block *fs_device, struct cache_block *LRU_block);
 int get_cache_index(block_sector_t sector);
 struct cache_block *get_cache_block (struct block *fs_device, block_sector_t sector);
+void cache_shutdown (struct block *fs_device);
 
 #endif /* filesys/cache.h */
