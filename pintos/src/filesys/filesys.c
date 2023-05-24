@@ -46,7 +46,7 @@ filesys_done (void)
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size, bool is_dir)
+filesys_create (const char *path, off_t initial_size, bool is_dir)
 {
   block_sector_t inode_sector = 0;
   struct dir *parent;
@@ -72,7 +72,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *
-filesys_open (const char *name)
+filesys_open (const char *path)
 {
   if (strcmp(path, "/") == 0)
     {
