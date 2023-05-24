@@ -46,13 +46,13 @@ filesys_done (void)
    Fails if a file named NAME already exists,
    or if internal memory allocation fails. */
 bool
-filesys_create (const char *name, off_t initial_size, bool is_dir)
+filesys_create (const char *path, off_t initial_size, bool is_dir)
 {
   block_sector_t inode_sector = 0;
   struct dir *parent;
   char tail[NAME_MAX + 1];
 
-  bool success = (dir_divide_path (&parent, tail, path)
+  bool success = (dir_split_new (&parent, tail, path)
                   && tail[0] != '\0'
                   && parent != NULL
                   && free_map_allocate (1, &inode_sector)
@@ -67,6 +67,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   return success;
 }
 
+
+
 /* Opens the file with the given NAME.
    Puts the file/directory in the given `descriptor`.
    Fails if no file named NAME exists,
@@ -74,10 +76,15 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
+    // printf("%s\n",name[0]);
+  if (name=="\0"){
+    return NULL;
+  }
   char directory[strlen(name) + 1];
   char file_name[NAME_MAX + 1];
   memset(directory, '\0', sizeof(directory));
   memset(file_name, '\0', sizeof(file_name));
+
 
   if (!split_path(name, directory, file_name)) {
     return NULL;

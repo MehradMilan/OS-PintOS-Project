@@ -307,40 +307,77 @@ bool copy_filename( char *path, char *filename, int pathLength, int index) {
     return true;
 }
 
-bool split_path( char *path, char *directory, char *filename)
-{
-    int pathLength = strlen(path);
+// bool split_path( char *path, char *directory, char *filename)
+// {
+//     int pathLength = strlen(path);
     
-    if(pathLength == 0)
-        return false;
+//     if(pathLength == 0)
+//         return false;
     
-    directory[0] = 0;
-    filename[0] = 0;
+//     directory[0] = 0;
+//     filename[0] = 0;
 
-    for(int i = pathLength - 1; i >= 0; --i) {
-        if(path[i] != '/')
-            continue;
+//     for(int i = pathLength - 1; i >= 0; --i) {
+//         if(path[i] != '/')
+//             continue;
         
-        if(!copy_filename(path, filename, pathLength, i))
-            return false;
+//         if(!copy_filename(path, filename, pathLength, i))
+//             return false;
 
-        int dirLength = i;
-        while(dirLength > 0 && path[dirLength - 1] == '/')
-            --dirLength;
+//         int dirLength = i;
+//         while(dirLength > 0 && path[dirLength - 1] == '/')
+//             --dirLength;
 
-        memcpy(directory, path, dirLength + 1);
-        directory[dirLength + 1] = '\0';
+//         memcpy(directory, path, dirLength + 1);
+//         directory[dirLength + 1] = '\0';
 
-        return true;
+//         return true;
+//     }
+
+//     if(pathLength > NAME_MAX)
+//         return false;
+
+//     if(!copy_filename(path, filename, pathLength, -1))
+//         return false;
+
+//     return true;
+// }
+
+
+
+/* Extracts directory and filename from path.*/
+bool
+split_path (const char *path, char *directory, char *filename)
+{
+  filename[0] = 0;
+  directory[0] = 0;
+  if (strlen (path) == 0)
+    return false;
+
+  for (int i = strlen (path) - 1; i >= 0; i--)
+    {
+
+      if (path[i] != '/')
+        continue;
+
+      if (strlen (path) - i - 1 > NAME_MAX)
+        return false;
+      memcpy (filename, path + i + 1, strlen (path) - i - 1);
+      filename[strlen (path) - i - 1] = '\0';
+
+      while (path[i - 1] == '/')
+        i--;
+      memcpy (directory, path, i + 1);
+      directory[i + 1] = '\0';
+
+      return true;
     }
 
-    if(pathLength > NAME_MAX)
-        return false;
-
-    if(!copy_filename(path, filename, pathLength, -1))
-        return false;
-
-    return true;
+  if (strlen (path) > NAME_MAX)
+    return false;
+  memcpy (filename, path, strlen (path));
+  filename[strlen (path)] = '\0';
+  return true;
 }
 
 
@@ -408,8 +445,32 @@ dir_open_path (const char *path)
    in `tail`. Note that `tail` must have allocated at least
    `NAME_MAX + 1` bytes of memory. `tail` will change to empty
    string in case of failure. */
+
+
+static int 
+get_next_part(char part[NAME_MAX + 1], const char** srcp)
+{ const char* src = *srcp;
+  char* dst = part;
+  while (*src == '/')
+    src++;
+  if (*src == '\0')
+    return 0;
+  while (*src != '/' && *src != '\0') 
+    {
+      if (dst < part + NAME_MAX)
+        *dst++ = *src;
+      else
+        return -1;
+      src++;
+    }
+  *dst = '\0';
+  *srcp = src;
+  return 1;
+}
+
+
 bool
-dir_divide_path(struct dir **parent, char *tail, const char *path)
+dir_split_new(struct dir **parent, char *tail, const char *path)
 {
   const char *t_path = path;
 
@@ -417,14 +478,12 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
     *parent = dir_open_root ();
   else
     {
-      // This is done to prevent PANIC before thread creation.
-      if (thread_current ()->cwd == NULL)
+      if (thread_current () ->working_dir == NULL )
         *parent = dir_open_root ();
       else
         {
-          if (inode_get_removed(thread_current ()->cwd->inode))
-            goto failed;
-          *parent = dir_reopen (thread_current ()->cwd);
+         
+          *parent = dir_reopen (thread_current ()->working_dir);
         }
     }
 
@@ -453,7 +512,7 @@ dir_divide_path(struct dir **parent, char *tail, const char *path)
             goto failed;
           if (next_inode) {
 
-              if (inode_get_removed (next_inode))
+              if (inode_is_removed (next_inode))
                 goto failed;
 
               struct dir *next_dir = dir_open(next_inode);
