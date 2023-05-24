@@ -286,17 +286,30 @@ syscall_handler (struct intr_frame *f UNUSED)
     sys_readdir(f, args[1], (char *) args[2]);
   } else if ( args[0] == SYS_CHDIR){
     sys_chdir(f, (char *) args[1]);
+  } else if ( SYS_INUMBER) {
+    sys_inumber(f, args[1] );
   }
-
-
 }
 
 
 
+void sys_inumber (struct intr_frame *f, int fid)
+{
 
-//dir  
+   struct file_descriptor *descriptor = get_fd_by_num(fid);
+  if (descriptor != NULL) {
+    struct file *file = descriptor->file;
+    if ((block_sector_t) inode_get_inumber (file_get_inode (file)) ) {
+    f->eax = file;
+  } else {
+    f->eax = -1;
+  }
+  } else {
+    f->eax = -1;
+  }
 
-
+}
+  
 
 void
   sys_isdir (struct intr_frame *f, int fid) {
@@ -381,4 +394,6 @@ sys_readdir (struct intr_frame *f, int fid, char *name)
     }
   }
 }
+
+
 

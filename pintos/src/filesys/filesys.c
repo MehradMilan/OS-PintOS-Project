@@ -74,35 +74,31 @@ filesys_create (const char *path, off_t initial_size, bool is_dir)
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 struct file *
-filesys_open (const char *path)
+filesys_open (const char *name)
 {
-  if (strcmp(path, "/") == 0)
-    {
-      return (struct file *) dir_open_root ();
-    }
+  char directory[strlen (name) + 1];
+  char file_name[NAME_MAX + 1];
+  directory[0] = '\0';
+  file_name[0] = '\0';
 
-  char tail[NAME_MAX + 1];
-  struct dir *dir = NULL;
-  dir_split_new(&dir, tail, path);
+  struct dir *dir = dir_open_path (directory);
   struct inode *inode = NULL;
+  if (dir != NULL && split_path (name, directory, file_name)){
 
-  if (dir != NULL)
-    dir_lookup (dir, tail, &inode);
-  dir_close (dir);
-
-  if (inode == NULL)
-    {
-      return NULL;
-    }
-
-  struct file* res;
-  if (is_directory_inode (inode))
-    {
-      res = (struct file *) dir_open (inode);
-      return res;
-    }
+  if (strlen (file_name) == 0)
+    inode = dir_get_inode (dir);
   else
-    return file_open (inode);
+    {dir_lookup (dir, file_name, &inode);
+      dir_close (dir);
+    }
+
+  if (inode == NULL || inode_is_removed (inode))
+    return NULL;
+
+  return file_open (inode);
+
+  } else return NULL;
+
 }
 
 
