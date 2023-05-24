@@ -302,7 +302,7 @@ bool copy_filename(const char *path, char *filename, int pathLength, int index) 
     return true;
 }
 
-bool split_path(const char *path, char *directory, char *filename)
+bool split_path(char *path, char *directory, char *filename)
 {
     int pathLength = strlen(path);
     
