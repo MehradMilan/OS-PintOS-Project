@@ -404,27 +404,21 @@ dir_open_path (const char *path)
   return NULL;
 }
 
-/* Reports the parent directory and the name of file/directory
-   in `tail`. Note that `tail` must have allocated at least
-   `NAME_MAX + 1` bytes of memory. `tail` will change to empty
-   string in case of failure. */
 bool
 dir_divide_path(struct dir **parent, char *tail, const char *path)
 {
   const char *t_path = path;
+  struct thread *curr_thread = thread_current ();
 
   if (path[0] == '/')
     *parent = dir_open_root ();
   else
     {
-      // This is done to prevent PANIC before thread creation.
-      if (thread_current ()->cwd == NULL)
+      if (curr_thread->working_dir == NULL)
         *parent = dir_open_root ();
       else
         {
-          if (inode_get_removed(thread_current ()->cwd->inode))
-            goto failed;
-          *parent = dir_reopen (thread_current ()->cwd);
+          *parent = dir_reopen (curr_thread->working_dir);
         }
     }
 
