@@ -307,78 +307,42 @@ bool copy_filename( char *path, char *filename, int pathLength, int index) {
     return true;
 }
 
-// bool split_path( char *path, char *directory, char *filename)
-// {
-//     int pathLength = strlen(path);
-    
-//     if(pathLength == 0)
-//         return false;
-    
-//     directory[0] = 0;
-//     filename[0] = 0;
-
-//     for(int i = pathLength - 1; i >= 0; --i) {
-//         if(path[i] != '/')
-//             continue;
-        
-//         if(!copy_filename(path, filename, pathLength, i))
-//             return false;
-
-//         int dirLength = i;
-//         while(dirLength > 0 && path[dirLength - 1] == '/')
-//             --dirLength;
-
-//         memcpy(directory, path, dirLength + 1);
-//         directory[dirLength + 1] = '\0';
-
-//         return true;
-//     }
-
-//     if(pathLength > NAME_MAX)
-//         return false;
-
-//     if(!copy_filename(path, filename, pathLength, -1))
-//         return false;
-
-//     return true;
-// }
-
-
-
-/* Extracts directory and filename from path.*/
-bool
-split_path (const char *path, char *directory, char *filename)
+bool split_path( char *path, char *directory, char *filename)
 {
-  filename[0] = 0;
-  directory[0] = 0;
-  if (strlen (path) == 0)
-    return false;
-
-  for (int i = strlen (path) - 1; i >= 0; i--)
-    {
-
-      if (path[i] != '/')
-        continue;
-
-      if (strlen (path) - i - 1 > NAME_MAX)
+    int pathLength = strlen(path);
+    
+    if(pathLength == 0)
         return false;
-      memcpy (filename, path + i + 1, strlen (path) - i - 1);
-      filename[strlen (path) - i - 1] = '\0';
+    
+    directory[0] = 0;
+    filename[0] = 0;
 
-      while (path[i - 1] == '/')
-        i--;
-      memcpy (directory, path, i + 1);
-      directory[i + 1] = '\0';
+    for(int i = pathLength - 1; i >= 0; --i) {
+        if(path[i] != '/')
+            continue;
+        
+        if(!copy_filename(path, filename, pathLength, i))
+            return false;
 
-      return true;
+        int dirLength = i;
+        while(dirLength > 0 && path[dirLength - 1] == '/')
+            --dirLength;
+
+        memcpy(directory, path, dirLength + 1);
+        directory[dirLength + 1] = '\0';
+
+        return true;
     }
 
-  if (strlen (path) > NAME_MAX)
-    return false;
-  memcpy (filename, path, strlen (path));
-  filename[strlen (path)] = '\0';
-  return true;
+    if(pathLength > NAME_MAX)
+        return false;
+
+    if(!copy_filename(path, filename, pathLength, -1))
+        return false;
+
+    return true;
 }
+
 
 
 struct dir *
@@ -473,6 +437,7 @@ bool
 dir_split_new(struct dir **parent, char *tail, const char *path)
 {
   const char *t_path = path;
+  struct thread *curr_thread = thread_current ();
 
   if (path[0] == '/')
     *parent = dir_open_root ();
