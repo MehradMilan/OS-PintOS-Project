@@ -59,7 +59,7 @@ validate_args (void *esp, int argc)
 return 1;
 }
 
-struct file* get_fd_by_num(int num) {
+struct file_descriptor* get_fd_by_num(int num) {
   struct list *fd_list = &thread_current ()->fd_list;
   struct list_elem *e;
 
@@ -91,6 +91,10 @@ sys_open (const char *name)
     new_fd->fd = fd_num ;
     cur->fd_count += 1;
     list_push_back(&cur->fd_list, &new_fd->elem);
+
+    struct inode *inode = file_get_inode (f);
+    if (inode && is_directory_inode (inode))
+      (get_fd_by_num(fd_num))->dir = dir_open (inode_reopen (inode)); 
     return fd_num; 
   }
 }
@@ -103,8 +107,10 @@ sys_close (int fdnum)
   struct file_descriptor *fd = get_fd_by_num(fdnum);
   if (!fd)
     return -1;
-  file_close(fd->file);
-  list_remove(&fd->elem);
+  file_close (fd->file);
+  if (fd->dir) 
+  dir_close (fd->dir);
+  list_remove (&fd->elem);
   free(fd);
   return 0;
 }
@@ -126,13 +132,12 @@ sys_write (int fd_num, const char *buffer, unsigned size)
   } else {
     struct file_descriptor *f_descriptor = get_fd_by_num(fd_num);
     struct file *f = f_descriptor->file; 
-    if (!f)
-      return -1;
-    if(get_dir_of_file(f) == NULL) {
-      bytes_written = file_write (f, buffer, size);
-    }
-    else
-      bytes_written = -1;
+    if(f_descriptor){  
+            struct inode *inode = file_get_inode (f);
+            if ( is_directory_inode  (inode) ) return -1 ; 
+            else 
+            bytes_written = file_write (f, buffer, size);
+            }
   }
   return bytes_written;
 }
@@ -312,7 +317,9 @@ void sys_inumber (struct intr_frame *f, int fid)
   }
 
 }
-  
+
+
+
 
 void
   sys_isdir (struct intr_frame *f, int fid) {

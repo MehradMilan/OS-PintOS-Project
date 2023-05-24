@@ -35,14 +35,10 @@ dir_create (block_sector_t sector, size_t entry_cnt)
   }
     
   dir = dir_open (inode_open (sector));
-
   e.in_use = false;
   e.inode_sector = sector;
-
   bytes_written = inode_write_at (dir_get_inode (dir), &e, sizeof (e), 0);
-
   dir_close (dir);
-
   return bytes_written == sizeof (e);
 }
 
