@@ -83,7 +83,7 @@ filesys_open (const char *path)
 
   char tail[NAME_MAX + 1];
   struct dir *dir = NULL;
-  dir_divide_path (&dir, tail, path);
+  dir_split_new(&dir, tail, path);
   struct inode *inode = NULL;
 
   if (dir != NULL)
@@ -96,7 +96,7 @@ filesys_open (const char *path)
     }
 
   struct file* res;
-  if (inode_isdir (inode))
+  if (is_directory_inode (inode))
     {
       res = (struct file *) dir_open (inode);
       return res;
