@@ -67,8 +67,6 @@ filesys_create (const char *path, off_t initial_size, bool is_dir)
   return success;
 }
 
-
-
 /* Opens the file with the given NAME.
    Puts the file/directory in the given `descriptor`.
    Fails if no file named NAME exists,
@@ -76,10 +74,19 @@ filesys_create (const char *path, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
-  char directory[strlen (name) + 1];
+
+  if (strcmp(name, "/") == 0)
+  {
+    return (struct file *) dir_open_root ();
+  }
+  if (strcmp(name, "") == 0) {
+    return NULL;
+  }
+
   char file_name[NAME_MAX + 1];
-  directory[0] = '\0';
+  char directory[strlen(name) + 1];
   file_name[0] = '\0';
+  directory[0] = '\0';
 
   struct dir *dir = dir_open_path (directory);
   struct inode *inode = NULL;

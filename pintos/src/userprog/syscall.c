@@ -95,7 +95,6 @@ sys_open (const char *name)
   }
 }
 
-
 int
 sys_close (int fdnum) 
 {
@@ -129,7 +128,11 @@ sys_write (int fd_num, const char *buffer, unsigned size)
     struct file *f = f_descriptor->file; 
     if (!f)
       return -1;
-    bytes_written = file_write (f, buffer, size);
+    if(get_dir_of_file(f) == NULL) {
+      bytes_written = file_write (f, buffer, size);
+    }
+    else
+      bytes_written = -1;
   }
   return bytes_written;
 }
@@ -329,8 +332,6 @@ void
 }
 
 
-
-
 struct 
 dir* open_valid_directory(char *dir_name, struct intr_frame *f) {
   if (!validate_addr(dir_name)) {
@@ -357,11 +358,6 @@ sys_chdir(struct intr_frame *f, char *dir_name) {
   }
 }
 
-
-
-
-
-
 void 
 sys_mkdir (struct intr_frame *f, char *dir_name)
 {
@@ -371,8 +367,6 @@ sys_mkdir (struct intr_frame *f, char *dir_name)
       f->eax = filesys_create (dir_name, 0, true);
     }
 }
-
-
 
 void 
 sys_readdir (struct intr_frame *f, int fid, char *name)
@@ -385,12 +379,9 @@ sys_readdir (struct intr_frame *f, int fid, char *name)
   struct file_descriptor *fd = get_fd_by_num(fid);
   f->eax = -1;
   if (fd && fd->file) {
-    struct inode *inode = file_get_inode(fd->file);
-    if (inode && is_directory_inode(inode)) {
-      struct dir *dir = fd->dir;
-      if (dir) {
+    struct dir *dir = get_dir_of_file(fd->file);
+    if (dir) {
         f->eax = dir_readdir(dir, name);
-      }
     }
   }
 }

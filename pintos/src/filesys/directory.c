@@ -498,3 +498,13 @@ dir_split_new(struct dir **parent, char *tail, const char *path)
   dir_close (*parent);
   return false;
 }
+
+struct dir* get_dir_of_file(struct file *file) {
+  if (file != NULL) {
+    struct inode *inode = file_get_inode(file);
+    if (inode != NULL && is_directory_inode(inode)) {
+      return (struct dir *) file;
+    }
+  }
+  return NULL;
+}
