@@ -116,8 +116,8 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e)
+for (ofs = sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+ ofs += sizeof e)
     if (e.in_use && !strcmp (name, e.name))
       {
         if (ep != NULL)
@@ -141,7 +141,12 @@ dir_lookup (const struct dir *dir, const char *name,
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+  if (strcmp (name, "..") == 0)
+    { inode_read_at (dir->inode, &e, sizeof e, 0);
+      *inode = inode_open (e.inode_sector);
+    }
+  else if (strcmp (name, ".") == 0)
+    *inode = inode_reopen (dir->inode);
   if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
@@ -293,7 +298,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 }
 
 
-bool copy_filename(const char *path, char *filename, int pathLength, int index) {
+bool copy_filename( char *path, char *filename, int pathLength, int index) {
     int tailLength = pathLength - index - 1;
     if(tailLength > NAME_MAX)
         return false;
@@ -302,7 +307,7 @@ bool copy_filename(const char *path, char *filename, int pathLength, int index) 
     return true;
 }
 
-bool split_path(const char *path, char *directory, char *filename)
+bool split_path( char *path, char *directory, char *filename)
 {
     int pathLength = strlen(path);
     
