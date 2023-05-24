@@ -7,6 +7,14 @@
 #include "cache.h"
 #include "filesys/filesys.h"
 
+struct cache_status
+{
+  size_t hits;
+  size_t misses;
+};
+
+static struct cache_status cache_stat;
+
 void
 cache_init (void)
 {
@@ -20,6 +28,7 @@ cache_init (void)
     cache[i].valid = false;
     list_push_back (&cache_LRU, &(cache[i].cache_elem));
   }
+  cache_stat = (struct cache_status) {0, 0};
 }
 
 void
@@ -46,6 +55,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
   lock_acquire (&cache_list_lock);
   if (index == -1)
   {
+    cache_stat.misses++;
     LRU_block = list_entry (list_pop_front (&cache_LRU), struct cache_block, cache_elem);
     lock_acquire (&LRU_block->cache_lock);
 
@@ -62,6 +72,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
   }
   else
   {
+    cache_stat.hits++;
     list_remove (&cache[index].cache_elem);
     list_push_back (&cache_LRU, &cache[index].cache_elem);
     LRU_block = &cache[index];
