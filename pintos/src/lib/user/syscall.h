@@ -53,5 +53,7 @@ void* sbrk (intptr_t increment);
 void spoil_cache (void);
 uint32_t cache_hit (void);
 uint32_t cache_miss (void);
+uint32_t cache_write (void);
+uint32_t cache_read (void);
 
 #endif /* lib/user/syscall.h */

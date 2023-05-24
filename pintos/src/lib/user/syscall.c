@@ -212,3 +212,13 @@ size_t
 cache_miss (void) {
   return syscall0 (SYS_CACHE_MISS);
 }
+
+size_t
+cache_write (void) {
+  return syscall0 (SYS_CACHE_WRITE);
+}
+
+size_t
+cache_read (void) {
+  return syscall0 (SYS_CACHE_READ);
+}

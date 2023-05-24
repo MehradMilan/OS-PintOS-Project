@@ -11,6 +11,8 @@ struct cache_status
 {
   size_t hits;
   size_t misses;
+  size_t writes;
+  size_t reads;
 };
 
 static struct cache_status cache_stat;
@@ -28,12 +30,13 @@ cache_init (void)
     cache[i].valid = false;
     list_push_back (&cache_LRU, &(cache[i].cache_elem));
   }
-  cache_stat = (struct cache_status) {0, 0};
+  cache_stat = (struct cache_status) {0, 0, 0, 0};
 }
 
 void
 flush_block (struct block *fs_device, struct cache_block *LRU_block)
 {
+  cache_stat.writes++;
   block_write(fs_device, LRU_block->sector_num, LRU_block->data);
   LRU_block->dirty = false;
 }
@@ -48,7 +51,7 @@ get_cache_index(block_sector_t sector)
 }
 
 struct cache_block *
-get_cache_block (struct block *fs_device, block_sector_t sector)
+get_cache_block (struct block *fs_device, block_sector_t sector, bool rt)
 {
   int index = get_cache_index (sector);
   struct cache_block* LRU_block;
@@ -62,7 +65,11 @@ get_cache_block (struct block *fs_device, block_sector_t sector)
     if (LRU_block->valid && LRU_block->dirty)
       flush_block (fs_device, LRU_block);
 
-    block_read (fs_device, sector, LRU_block->data);
+    // block_read (fs_device, sector, LRU_block->data);
+    if (rt) {
+      cache_stat.reads++;
+      block_read (fs_device, sector, LRU_block->data);
+    }
     LRU_block->sector_num = sector;
     LRU_block->valid = true;
     LRU_block->dirty = false;
@@ -89,7 +96,7 @@ cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, of
   ASSERT (fs_device != NULL);
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
 
-  struct cache_block* cb = get_cache_block(fs_device, sector_idx);
+  struct cache_block* cb = get_cache_block(fs_device, sector_idx, true);
   lock_acquire(&cb->cache_lock);
 
   memcpy(buffer, &(cb->data[offset]), chunk_size);
@@ -103,7 +110,12 @@ cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, o
   ASSERT (fs_device != NULL);
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
 
-  struct cache_block* cb = get_cache_block (fs_device, sector_idx);
+  // struct cache_block* cb = get_cache_block (fs_device, sector_idx);
+  struct cache_block* cb;
+  if (offset != 0 || chunk_size >= BLOCK_SECTOR_SIZE)
+    cb = get_cache_block (fs_device, sector_idx, true);
+  else
+    cb = get_cache_block (fs_device, sector_idx, false);
   lock_acquire(&cb->cache_lock);
 
   memcpy(&(cb->data[offset]), buffer, chunk_size);
@@ -131,6 +143,8 @@ void spoil_block(struct cache_block *b) {
 void reset_cache_stat(struct cache_status* c_stat) {
     c_stat->hits = 0;
     c_stat->misses = 0;
+    c_stat->reads = 0;
+    c_stat->writes = 0;
 }
 
 void cache_spoil (struct cache_block *fs_device) {
@@ -147,4 +161,12 @@ size_t get_cache_hits (void) {
 
 size_t get_cache_misses (void) {
   return cache_stat.misses;
+}
+
+size_t get_cache_reads (void) {
+  return cache_stat.reads;
+}
+
+size_t get_cache_writes (void) {
+  return cache_stat.writes;
 }
