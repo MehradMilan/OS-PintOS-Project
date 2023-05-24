@@ -122,3 +122,29 @@ cache_shutdown (struct block *fs_device)
     }
 
 }
+
+void spoil_block(struct cache_block *b) {
+    b->valid = false;
+    b->dirty = false;
+}
+
+void reset_cache_stat(struct cache_status* c_stat) {
+    c_stat->hits = 0;
+    c_stat->misses = 0;
+}
+
+void cache_spoil (struct cache_block *fs_device) {
+    cache_shutdown (fs_device);
+    for (int i = CACHE_SIZE - 1; i >= 0; i--)
+      spoil_block(&cache[i]);
+
+    reset_cache_stat(&cache_stat);
+}
+
+size_t get_cache_hits (void) {
+  return cache_stat.hits;
+}
+
+size_t get_cache_misses (void) {
+  return cache_stat.misses;
+}

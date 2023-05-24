@@ -38,4 +38,10 @@ int get_cache_index(block_sector_t sector);
 struct cache_block *get_cache_block (struct block *fs_device, block_sector_t sector);
 void cache_shutdown (struct block *fs_device);
 
+void cache_spoil (struct cache_block *fs_device);
+void reset_cache_stat(struct cache_status* c_stat);
+void spoil_block(struct cache_block *b);
+size_t get_cache_misses (void);
+size_t get_cache_hits (void);
+
 #endif /* filesys/cache.h */
