@@ -74,36 +74,33 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
-  char directory[strlen(name) + 1];
-  char file_name[NAME_MAX + 1];
-  memset(directory, '\0', sizeof(directory));
-  memset(file_name, '\0', sizeof(file_name));
+  if (strcmp(path, "/") == 0)
+    {
+      return (struct file *) dir_open_root ();
+    }
 
-  if (!split_path(name, directory, file_name)) {
-    return NULL;
-  }
-
-  struct dir *dir = dir_open_path(directory);
-  if (dir == NULL) {
-    return NULL;
-  }
-
+  char tail[NAME_MAX + 1];
+  struct dir *dir = NULL;
+  dir_divide_path (&dir, tail, path);
   struct inode *inode = NULL;
-  if (strlen(file_name) == 0) {
-    inode = dir_get_inode(dir);
-  } else {
-    if (!dir_lookup(dir, file_name, &inode)) {
-      dir_close(dir);
+
+  if (dir != NULL)
+    dir_lookup (dir, tail, &inode);
+  dir_close (dir);
+
+  if (inode == NULL)
+    {
       return NULL;
     }
-    dir_close(dir);
-  }
 
-  if (inode == NULL || inode_is_removed(inode)) {
-    return NULL;
-  }
-
-  return file_open(inode);
+  struct file* res;
+  if (inode_isdir (inode))
+    {
+      res = (struct file *) dir_open (inode);
+      return res;
+    }
+  else
+    return file_open (inode);
 }
 
 
