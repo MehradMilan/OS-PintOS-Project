@@ -114,9 +114,11 @@ sys_close (int fdnum)
   struct file_descriptor *fd = get_fd_by_num(fdnum);
   if (!fd)
     return -1;
-  file_close (fd->file);
-  if (fd->dir) 
-  dir_close (fd->dir);
+  struct file *f = fd->file; 
+  if(get_dir_of_file(f) == NULL)
+    file_close(f);
+  else
+    dir_close(get_dir_of_file(f));
   list_remove (&fd->elem);
   free(fd);
   return 0;
@@ -328,10 +330,10 @@ void sys_inumber (struct intr_frame *f, int fid)
     if ((block_sector_t) inode_get_inumber (file_get_inode (file)) ) {
     f->eax = file;
   } else {
-    f->eax = -1;
+    f->eax = false;
   }
   } else {
-    f->eax = -1;
+    f->eax = false;
   }
 
 }
@@ -349,10 +351,10 @@ void
       struct inode *inode = file_get_inode(file);
       f->eax =  is_directory_inode(inode);
     } else {
-      f->eax = -1;
+      f->eax = false;
     }
   } else {
-    f->eax = -1;
+    f->eax = false;
   }
 }
 
@@ -400,7 +402,7 @@ sys_readdir (struct intr_frame *f, int fid, char *name)
   }
 
   struct file_descriptor *fd = get_fd_by_num(fid);
-  f->eax = -1;
+  f->eax = false;
   if (fd && fd->file) {
     struct dir *dir = get_dir_of_file(fd->file);
     if (dir) {
