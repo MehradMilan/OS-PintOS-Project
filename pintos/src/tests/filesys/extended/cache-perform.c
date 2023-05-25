@@ -15,7 +15,7 @@ void
 test_main (void)
 {
   create_and_write_file("a");
-  invalidate_cache ();
+  spoil_cache ();
   msg ("File creation completed.");
 
   int fd = open("a");

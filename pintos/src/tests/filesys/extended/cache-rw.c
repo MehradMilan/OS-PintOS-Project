@@ -24,7 +24,7 @@ test_main (void)
 void create_and_write_file(const char* file_name) {
   CHECK (create (file_name, FILE_SIZE), "create \"%s\" should not fail.", file_name);
   msg ("File creation completed.");
-  invalidate_cache ();
+  spoil_cache ();
   int fd = open(file_name);
   CHECK (fd > 2, "open \"%s\" returned fd which should be greater than 2.", file_name);
   random_init (0);
@@ -39,8 +39,8 @@ void create_and_write_file(const char* file_name) {
 
 void validate_cache_counts() {
   size_t max_write = BLOCK_COUNT + ACCEPTABLE_ERROR;
-  CHECK (cache_write_count () < max_write,
+  CHECK (cache_write () < max_write,
          "Block write count should be less than %d.", max_write);
-  CHECK (cache_read_count () < ACCEPTABLE_ERROR,
+  CHECK (cache_read () < ACCEPTABLE_ERROR,
          "Block read count should be less than acceptable error %d.", ACCEPTABLE_ERROR);
 }
