@@ -35,7 +35,15 @@ void cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffe
 void cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size);
 void flush_block (struct block *fs_device, struct cache_block *LRU_block);
 int get_cache_index(block_sector_t sector);
-struct cache_block *get_cache_block (struct block *fs_device, block_sector_t sector);
+struct cache_block *get_cache_block (struct block *fs_device, block_sector_t sector, bool rt);
 void cache_shutdown (struct block *fs_device);
+
+void cache_spoil (struct cache_block *fs_device);
+void reset_cache_stat(struct cache_status* c_stat);
+void spoil_block(struct cache_block *b);
+size_t get_cache_misses (void);
+size_t get_cache_hits (void);
+size_t get_cache_writes (void);
+size_t get_cache_reads (void);
 
 #endif /* filesys/cache.h */
