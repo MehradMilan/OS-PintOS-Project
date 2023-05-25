@@ -59,7 +59,7 @@ filesys_create (const char *path, off_t initial_size, bool is_dir)
                   && (is_dir
                       ?dir_create (inode_sector, 16)
                       :inode_create (inode_sector, initial_size, false))
-                  && dir_add (parent, tail, inode_sector, true));
+                  && dir_add (parent, tail, inode_sector));
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
   dir_close (parent);
@@ -108,9 +108,6 @@ struct file *filesys_open (const char *path) {
         return file_open(inode);
     }
 }
-
-
-
 
 /* Deletes the file named NAME.
    Returns true if successful, false on failure.

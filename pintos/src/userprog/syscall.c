@@ -106,6 +106,22 @@ sys_open (const char *name)
   }
 }
 
+// int
+// sys_close (int fdnum) 
+// {
+//   if (fdnum <= STDOUT_FILENO)
+//     sys_exit(-1);
+//   struct file_descriptor *fd = get_fd_by_num(fdnum);
+//   if (!fd)
+//     return -1;
+//   file_close (fd->file);
+//   if (fd->dir) 
+//   dir_close (fd->dir);
+//   list_remove (&fd->elem);
+//   free(fd);
+//   return 0;
+// }
+
 int
 sys_close (int fdnum) 
 {
@@ -330,10 +346,10 @@ void sys_inumber (struct intr_frame *f, int fid)
     if ((block_sector_t) inode_get_inumber (file_get_inode (file)) ) {
     f->eax = file;
   } else {
-    f->eax = false;
+    f->eax = -1;
   }
   } else {
-    f->eax = false;
+    f->eax = -1;
   }
 
 }
@@ -351,10 +367,10 @@ void
       struct inode *inode = file_get_inode(file);
       f->eax =  is_directory_inode(inode);
     } else {
-      f->eax = false;
+      f->eax = -1;
     }
   } else {
-    f->eax = false;
+    f->eax = -1;
   }
 }
 
@@ -402,7 +418,7 @@ sys_readdir (struct intr_frame *f, int fid, char *name)
   }
 
   struct file_descriptor *fd = get_fd_by_num(fid);
-  f->eax = false;
+  f->eax = -1;
   if (fd && fd->file) {
     struct dir *dir = get_dir_of_file(fd->file);
     if (dir) {
