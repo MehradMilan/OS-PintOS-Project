@@ -71,42 +71,42 @@ filesys_create (const char *path, off_t initial_size, bool is_dir)
    Puts the file/directory in the given `descriptor`.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
-struct file *
-filesys_open (const char *name)
-{
-
-  if (strcmp(name, "/") == 0)
-  {
-    return (struct file *) dir_open_root ();
-  }
-  if (strcmp(name, "") == 0) {
-    return NULL;
-  }
-
-  char file_name[NAME_MAX + 1];
-  char directory[strlen(name) + 1];
-  file_name[0] = '\0';
-  directory[0] = '\0';
-
-  struct dir *dir = dir_open_path (directory);
-  struct inode *inode = NULL;
-  if (dir != NULL && split_path (name, directory, file_name)){
-
-  if (strlen (file_name) == 0)
-    inode = dir_get_inode (dir);
-  else
-    {dir_lookup (dir, file_name, &inode);
-      dir_close (dir);
+static struct dir* open_root_or_split(const char* path, char* tail) {
+    if (strcmp(path, "/") == 0) {
+        return dir_open_root();
     }
 
-  if (inode == NULL || inode_is_removed (inode))
-    return NULL;
-
-  return file_open (inode);
-
-  } else return NULL;
-
+    struct dir *dir = NULL;
+    dir_split_new(&dir, tail, path);
+    return dir;
 }
+
+static struct inode* get_inode(struct dir* dir, const char* tail) {
+    struct inode *inode = NULL;
+    if (dir != NULL) {
+        dir_lookup(dir, tail, &inode);
+    }
+    dir_close(dir);
+    return inode;
+}
+
+struct file *filesys_open (const char *path) {
+    char tail[NAME_MAX + 1];
+    struct dir *dir = open_root_or_split(path, tail);
+
+    struct inode *inode = get_inode(dir, tail);
+    if (inode == NULL) {
+        return NULL;
+    }
+
+    if (is_directory_inode(inode)) {
+        return (struct file *) dir_open(inode);
+    } else {
+        return file_open(inode);
+    }
+}
+
+
 
 
 /* Deletes the file named NAME.
@@ -114,10 +114,13 @@ filesys_open (const char *name)
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
 bool
-filesys_remove (const char *name)
+filesys_remove (const char *path)
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
+  char tail[NAME_MAX + 1];
+  struct dir *dir = NULL;
+  dir_split_new (&dir, tail, path);
+  
+  bool success = dir != NULL && dir_remove (dir, tail);
   dir_close (dir);
 
   return success;
