@@ -490,7 +490,11 @@ inode_disk_deallocate (struct inode *inode)
   return true;
 }
 
-
+bool
+inode_disk_isdir (const struct inode_disk *disk_inode)
+{
+  return disk_inode->is_dir;
+}
 
 bool
 is_directory_inode (const struct inode *inode)

@@ -37,8 +37,8 @@ cache_init (void)
 void
 flush_block (struct block *fs_device, struct cache_block *LRU_block)
 {
+  ++cache_stat.writes;
   block_write(fs_device, LRU_block->sector_num, LRU_block->data);
-  cache_stat.writes++;
   LRU_block->dirty = false;
 }
 
@@ -59,7 +59,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector, bool rt)
   lock_acquire (&cache_list_lock);
   if (index == -1)
   {
-    cache_stat.misses++;
+    ++cache_stat.misses;
     LRU_block = list_entry (list_pop_front (&cache_LRU), struct cache_block, cache_elem);
     lock_acquire (&LRU_block->cache_lock);
 
@@ -68,7 +68,7 @@ get_cache_block (struct block *fs_device, block_sector_t sector, bool rt)
 
     // block_read (fs_device, sector, LRU_block->data);
     if (rt) {
-      cache_stat.reads++;
+      ++cache_stat.reads;
       block_read (fs_device, sector, LRU_block->data);
     }
     LRU_block->sector_num = sector;
@@ -113,10 +113,10 @@ cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, o
 
   // struct cache_block* cb = get_cache_block (fs_device, sector_idx);
   struct cache_block* cb;
-  if (offset != 0 || chunk_size >= BLOCK_SECTOR_SIZE)
-    cb = get_cache_block (fs_device, sector_idx, true);
-  else
+  if (offset == 0 && chunk_size >= BLOCK_SECTOR_SIZE)
     cb = get_cache_block (fs_device, sector_idx, false);
+  else
+    cb = get_cache_block (fs_device, sector_idx, true);
   lock_acquire(&cb->cache_lock);
 
   memcpy(&(cb->data[offset]), buffer, chunk_size);
@@ -142,27 +142,14 @@ void spoil_block(struct cache_block *b) {
     b->dirty = false;
 }
 
-// void reset_cache_stat(struct cache_status* c_stat) {
-//     c_stat->hits = 0;
-//     c_stat->misses = 0;
-//     c_stat->reads = 0;
-//     c_stat->writes = 0;
-// }
-
 void cache_spoil (struct cache_block *fs_device) {
     cache_shutdown (fs_device);
-    for (int i = CACHE_SIZE - 1; i >= 0; i--)
+    for (int i = 0; i < CACHE_SIZE; i++)
     {
     cache[i].valid = false;
     cache[i].dirty = false;
     }
-      // spoil_block(&cache[i]);
-    // c_stat->hits = 0;
-    // c_stat->misses = 0;
-    // c_stat->reads = 0;
-    // c_stat->writes = 0;
     cache_stat = (struct cache_status) {0, 0, 0, 0};
-  //  reset_cache_stat(&cache_stat);
 }
 
 size_t get_cache_hits (void) {

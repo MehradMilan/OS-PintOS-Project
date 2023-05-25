@@ -99,10 +99,9 @@ sys_open (const char *name)
     new_fd->fd = fd_num ;
     cur->fd_count += 1;
     list_push_back(&cur->fd_list, &new_fd->elem);
-
     struct inode *inode = file_get_inode (f);
     if (inode && is_directory_inode (inode))
-      (get_fd_by_num(fd_num))->dir = dir_open (inode_reopen (inode)); 
+      (get_fd_by_num(fd_num))->dir = dir_open (inode_reopen (inode));
     return fd_num; 
   }
 }
@@ -364,9 +363,7 @@ dir* open_valid_directory(char *dir_name, struct intr_frame *f) {
     sys_exit(-1);
     return NULL;
   }
-
   struct dir *new_dir = dir_open_path(dir_name);
-
   return new_dir;
 }
 

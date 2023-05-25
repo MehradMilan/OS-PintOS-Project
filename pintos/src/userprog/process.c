@@ -387,6 +387,7 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+  t->exec_file = file;
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -394,7 +395,7 @@ load (char *file_name, void (**eip) (void), void **esp)
     }
 
   file_deny_write(file);
-  t->exec_file = file;
+  
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

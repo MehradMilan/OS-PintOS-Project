@@ -91,6 +91,10 @@ static struct inode* get_inode(struct dir* dir, const char* tail) {
 }
 
 struct file *filesys_open (const char *path) {
+    if (strcmp(path, "/") == 0)
+    {
+      return (struct file *) dir_open_root ();
+    }
     char tail[NAME_MAX + 1];
     struct dir *dir = open_root_or_split(path, tail);
 
@@ -98,7 +102,6 @@ struct file *filesys_open (const char *path) {
     if (inode == NULL) {
         return NULL;
     }
-
     if (is_directory_inode(inode)) {
         return (struct file *) dir_open(inode);
     } else {
