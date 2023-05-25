@@ -142,12 +142,12 @@ void spoil_block(struct cache_block *b) {
     b->dirty = false;
 }
 
-void reset_cache_stat(struct cache_status* c_stat) {
-    c_stat->hits = 0;
-    c_stat->misses = 0;
-    c_stat->reads = 0;
-    c_stat->writes = 0;
-}
+// void reset_cache_stat(struct cache_status* c_stat) {
+//     c_stat->hits = 0;
+//     c_stat->misses = 0;
+//     c_stat->reads = 0;
+//     c_stat->writes = 0;
+// }
 
 void cache_spoil (struct cache_block *fs_device) {
     cache_shutdown (fs_device);
