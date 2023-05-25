@@ -52,9 +52,8 @@ dir_open (struct inode *inode)
   if (inode != NULL && dir != NULL)
     {
       dir->inode = inode;
-      dir->pos = 0;
-      return dir;
-    }
+      dir -> pos =  sizeof (struct dir_entry);
+      return dir;}
   else
     {
       inode_close (inode);
@@ -62,6 +61,7 @@ dir_open (struct inode *inode)
       return NULL;
     }
 }
+
 
 /* Opens the root directory and returns a directory for it.
    Return true if successful, false on failure. */
@@ -303,41 +303,6 @@ bool copy_filename( char *path, char *filename, int pathLength, int index) {
     return true;
 }
 
-bool split_path( char *path, char *directory, char *filename)
-{
-    int pathLength = strlen(path);
-    
-    if(pathLength == 0)
-        return false;
-    
-    directory[0] = 0;
-    filename[0] = 0;
-
-    for(int i = pathLength - 1; i >= 0; --i) {
-        if(path[i] != '/')
-            continue;
-        
-        if(!copy_filename(path, filename, pathLength, i))
-            return false;
-
-        int dirLength = i;
-        while(dirLength > 0 && path[dirLength - 1] == '/')
-            --dirLength;
-
-        memcpy(directory, path, dirLength + 1);
-        directory[dirLength + 1] = '\0';
-
-        return true;
-    }
-
-    if(pathLength > NAME_MAX)
-        return false;
-
-    if(!copy_filename(path, filename, pathLength, -1))
-        return false;
-
-    return true;
-}
 
 
 
@@ -383,28 +348,6 @@ traverse_path (struct dir *curr_dir, char const_path[])
   return curr_dir;
 }
 
-struct dir *
-dir_open_path (const char *path)
-{
-  struct dir *curr_dir = initialize_directory(path);
-
-  size_t cpl = strlen (path) + 1;
-  char const_path[cpl];
-  memcpy (const_path, path, cpl);
-
-  curr_dir = traverse_path(curr_dir, const_path);
-
-  if (!inode_is_removed (dir_get_inode (curr_dir)))
-    return curr_dir;
-
-  dir_close (curr_dir);
-  return NULL;
-}
-
-/* Reports the parent directory and the name of file/directory
-   in `tail`. Note that `tail` must have allocated at least
-   `NAME_MAX + 1` bytes of memory. `tail` will change to empty
-   string in case of failure. */
 
 
 static int 
@@ -494,6 +437,52 @@ dir_split_new(struct dir **parent, char *tail, const char *path)
   dir_close (*parent);
   return false;
 }
+struct dir *
+get_directory(const char *path)
+{
+  if (strcmp(path, "/") == 0)
+    return dir_open_root ();
+
+  char tail[NAME_MAX + 1];
+  struct dir *parent;
+  dir_split_new(&parent, tail, path);
+  return parent;
+}
+
+void 
+dir_cleanup(struct dir *dir, struct inode *inode)
+{
+  if (inode != NULL) inode_close(inode);
+  if (dir != NULL) dir_close(dir);
+}
+
+struct dir *
+dir_open_path (const char *path)
+{
+  struct dir *dir = get_directory(path);
+  if (!dir) 
+    return NULL;
+
+  struct inode *inode;
+  char tail[NAME_MAX + 1];
+  dir_split_new(&dir, tail, path);
+  
+  if (!dir_lookup (dir, tail, &inode) || inode_is_removed(inode))
+  {
+    dir_cleanup (dir, inode);
+    return NULL;
+  }
+  
+  return dir_open (inode);
+}
+
+
+
+/* Reports the parent directory and the name of file/directory
+   in `tail`. Note that `tail` must have allocated at least
+   `NAME_MAX + 1` bytes of memory. `tail` will change to empty
+   string in case of failure. */
+
 
 struct dir* get_dir_of_file(struct file *file) {
   if (file != NULL) {
