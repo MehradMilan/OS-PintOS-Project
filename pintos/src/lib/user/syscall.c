@@ -197,3 +197,28 @@ sbrk (intptr_t increment)
   /* Homework 5, Part B: YOUR CODE HERE */
   return NULL;
 }
+
+void
+spoil_cache(void) {
+  syscall0 (SYS_CACHE_SPOIL);
+}
+
+size_t
+cache_hit (void) {
+  return syscall0 (SYS_CACHE_HIT);
+}
+
+size_t
+cache_miss (void) {
+  return syscall0 (SYS_CACHE_MISS);
+}
+
+size_t
+cache_write (void) {
+  return syscall0 (SYS_CACHE_WRITE);
+}
+
+size_t
+cache_read (void) {
+  return syscall0 (SYS_CACHE_READ);
+}

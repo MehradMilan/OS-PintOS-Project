@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "filesys/directory.h"
+#include "filesys/cache.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -21,6 +22,13 @@ static void syscall_handler (struct intr_frame *);
 void sys_exit (int status);
 int sys_write (int fd_num, const char *buffer, unsigned size);
 int sys_create (const char* name, unsigned initial_size);
+
+void cache_spoil_syscall (void);
+void cache_hit_syscall (struct intr_frame *);
+void cache_miss_syscall (struct intr_frame *);
+void cache_write_syscall (struct intr_frame *);
+void cache_read_syscall (struct intr_frame *);
+
 
 void
 syscall_init (void)
@@ -296,7 +304,18 @@ syscall_handler (struct intr_frame *f UNUSED)
     sys_chdir(f, (char *) args[1]);
   } else if ( SYS_INUMBER) {
     sys_inumber(f, args[1] );
+  } else if (args[0] == SYS_CACHE_SPOIL) {
+    cache_spoil_syscall();
+  } else if (args[0] == SYS_CACHE_HIT) {
+    cache_hit_syscall (f);
+  } else if (args[0] == SYS_CACHE_MISS) {
+    cache_miss_syscall (f);
+  } else if (args[0] == SYS_CACHE_READ) {
+    cache_read_syscall (f);
+  } else if (args[0] == SYS_CACHE_WRITE) {
+    cache_write_syscall (f);
   }
+
 }
 
 
@@ -393,5 +412,27 @@ sys_readdir (struct intr_frame *f, int fid, char *name)
   }
 }
 
+void
+cache_spoil_syscall (void) {
+  cache_spoil(fs_device);
+}
 
+void
+cache_hit_syscall (struct intr_frame *f) {
+  f->eax = get_cache_hits();
+}
 
+void
+cache_miss_syscall (struct intr_frame *f) {
+  f->eax = get_cache_misses();
+}
+
+void
+cache_write_syscall (struct intr_frame *f) {
+  f->eax = get_cache_writes();
+}
+
+void
+cache_read_syscall (struct intr_frame *f) {
+  f->eax = get_cache_reads();
+}
