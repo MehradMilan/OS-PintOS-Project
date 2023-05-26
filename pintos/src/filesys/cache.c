@@ -42,54 +42,73 @@ flush_block (struct block *fs_device, struct cache_block *LRU_block)
   LRU_block->dirty = false;
 }
 
-int
-get_cache_index(block_sector_t sector)
-{
-  for (int i=0; i < CACHE_SIZE; i++)
-    if(cache[i].valid && cache[i].sector_num == sector)
-      return i;
-  return -1;
+
+
+struct cache_block* handle_cache_miss(struct block *fs_device, block_sector_t sector, bool rt) {
+    struct cache_block* LRU_block;
+
+    ++cache_stat.misses;
+    LRU_block = list_entry(list_pop_front(&cache_LRU), struct cache_block, cache_elem);
+    lock_acquire(&LRU_block->cache_lock);
+
+    if (LRU_block->valid && LRU_block->dirty) {
+        flush_block(fs_device, LRU_block);
+    }
+
+    if (rt) {
+        ++cache_stat.reads;
+        block_read(fs_device, sector, LRU_block->data);
+    }
+
+    update_LRU_block_info(LRU_block, sector);
+
+    lock_release(&LRU_block->cache_lock);
+
+    return LRU_block;
 }
 
-struct cache_block *
-get_cache_block (struct block *fs_device, block_sector_t sector, bool rt)
-{
-  int index = get_cache_index (sector);
-  struct cache_block* LRU_block;
-  lock_acquire (&cache_list_lock);
-  if (index == -1)
-  {
-    ++cache_stat.misses;
-    LRU_block = list_entry (list_pop_front (&cache_LRU), struct cache_block, cache_elem);
-    lock_acquire (&LRU_block->cache_lock);
-
-    if (LRU_block->valid && LRU_block->dirty)
-      flush_block (fs_device, LRU_block);
-
-    // block_read (fs_device, sector, LRU_block->data);
-    if (rt) {
-      ++cache_stat.reads;
-      block_read (fs_device, sector, LRU_block->data);
-    }
+void update_LRU_block_info(struct cache_block* LRU_block, block_sector_t sector) {
     LRU_block->sector_num = sector;
     LRU_block->valid = true;
     LRU_block->dirty = false;
-    list_push_back (&cache_LRU, &LRU_block->cache_elem);
-
-    lock_release (&LRU_block->cache_lock);
-  }
-  else
-  {
-    cache_stat.hits++;
-    list_remove (&cache[index].cache_elem);
-    list_push_back (&cache_LRU, &cache[index].cache_elem);
-    LRU_block = &cache[index];
-  }
-
-  lock_release (&cache_list_lock);
-
-  return LRU_block;
+    list_push_back(&cache_LRU, &LRU_block->cache_elem);
 }
+
+struct cache_block* handle_cache_hit(int index) {
+    cache_stat.hits++;
+    list_remove(&cache[index].cache_elem);
+    list_push_back(&cache_LRU, &cache[index].cache_elem);
+    return &cache[index];
+}
+
+int get_cache_index(block_sector_t sector) {
+    for (int i=0; i < CACHE_SIZE; i++) {
+        struct cache_block current_block = cache[i];
+        if (current_block.valid && current_block.sector_num == sector) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+struct cache_block* get_cache_block (struct block *fs_device, block_sector_t sector, bool rt) {
+    lock_acquire (&cache_list_lock);
+
+    int index = get_cache_index(sector);
+    struct cache_block* target_block;
+
+    if (index == -1) {
+        target_block = handle_cache_miss(fs_device, sector, rt);
+    } else {
+        target_block = handle_cache_hit(index);
+    }
+
+    lock_release (&cache_list_lock);
+    return target_block;
+}
+
+
+
 
 void
 cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size)
@@ -111,7 +130,6 @@ cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, o
   ASSERT (fs_device != NULL);
   ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
 
-  // struct cache_block* cb = get_cache_block (fs_device, sector_idx);
   struct cache_block* cb;
   if (offset == 0 && chunk_size >= BLOCK_SECTOR_SIZE)
     cb = get_cache_block (fs_device, sector_idx, false);

@@ -395,89 +395,112 @@ static int get_next_part(char part[NAME_MAX + 1], const char **srcp) {
     return -1;
   }
 }
+bool
+initialize_parent(struct dir **parent, const char *path)
+{
+  if (path[0] == '/')
+  {
+    *parent = dir_open_root ();
+  }
+  else
+  {
+    if (thread_current()->working_dir == NULL)
+      *parent = dir_open_root ();
+    else
+    {
+      if (inode_is_removed(thread_current()->working_dir->inode))
+        return false;
+      *parent = dir_reopen(thread_current()->working_dir);
+    }
+  }
+  return true;
+}
+
+bool
+process_tail(struct dir **parent, char *tail, struct inode **next_inode, bool *failed_lookup)
+{
+  if (strlen(tail) > 0)
+  {
+    if (!dir_lookup(*parent, tail, next_inode))
+      *failed_lookup = true;
+  }
+  return true;
+}
+
+bool
+process_next_part(struct dir **parent, struct inode **next_inode, bool *failed_lookup)
+{
+  if (*failed_lookup)
+    return false;
+  if (*next_inode)
+  {
+    if (inode_is_removed(*next_inode))
+      return false;
+
+    struct dir *next_dir = dir_open(*next_inode);
+    if (next_dir == NULL)
+      return false;
+
+    dir_close(*parent);
+    *parent = next_dir;
+  }
+  return true;
+}
 
 bool
 dir_split_new(struct dir **parent, char *tail, const char *path)
 {
   const char *t_path = path;
-  // struct thread *curr_thread = thread_current ();
 
-  if (path[0] == '/')
-    *parent = dir_open_root ();
-  else
-    {
-      if (thread_current () ->working_dir == NULL )
-        *parent = dir_open_root ();
-      else
-        {
-          if (inode_is_removed(thread_current()->working_dir->inode))
-            goto failed;
-          *parent = dir_reopen (thread_current ()->working_dir);
-        }
-    }
+  if (!initialize_parent(parent, path))
+    return false;
 
   *tail = '\0';
   while (true)
+  {
+    struct inode *next_inode = NULL;
+    bool failed_lookup = false;
+
+    process_tail(parent, tail, &next_inode, &failed_lookup);
+
+    int result = get_next_part(tail, &t_path);
+    if (result < 0)
+      goto failed;
+    else if (result == 0)
     {
-      struct inode *next_inode = NULL;
-      bool failed_lookup = false;
-      if (strlen(tail) > 0)
-        {
-          if (!dir_lookup (*parent, tail, &next_inode))
-            failed_lookup = true;
-        }
-
-      int result = get_next_part (tail, &t_path);
-      if (result < 0)
-        goto failed;
-      else if (result == 0)
-        {
-          inode_close (next_inode);
-          break;
-        }
-
-      else {
-          if (failed_lookup)
-            goto failed;
-          if (next_inode) {
-
-              if (inode_is_removed (next_inode))
-                goto failed;
-
-              struct dir *next_dir = dir_open(next_inode);
-              if (next_dir == NULL)
-                goto failed;
-
-              dir_close (*parent);
-
-              *parent = next_dir;
-            }
-        }
+      inode_close(next_inode);
+      break;
     }
+
+    if (!process_next_part(parent, &next_inode, &failed_lookup))
+      goto failed;
+  }
   return true;
 
-  failed:
+failed:
   *tail = '\0';
   *parent = NULL;
-  dir_close (*parent);
+  dir_close(*parent);
   return false;
 }
 
-struct dir *get_directory(const char *path) {
-  if (strcmp(path, "/") == 0) {
+struct dir *
+get_directory(const char *path)
+{
+  if (strcmp(path, "/") == 0)
+  {
     return dir_open_root();
   }
 
   char tail[NAME_MAX + 1];
   struct dir *parent = NULL;
-  bool success = dir_split_new(&parent, tail, path);
-
-  if (!success) {
+  if (!dir_split_new(&parent, tail, path))
+  {
     return NULL;
   }
-
   return parent;
 }
+
 
 void 
 dir_cleanup(struct dir *dir, struct inode *inode)
