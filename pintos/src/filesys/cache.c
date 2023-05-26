@@ -110,39 +110,40 @@ struct cache_block* get_cache_block (struct block *fs_device, block_sector_t sec
 
 
 
-void
-cache_read (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size)
+enum operation_type { READ, WRITE };
+
+void cache_operation(enum operation_type op, struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size) 
 {
-  ASSERT (fs_device != NULL);
-  ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
+    ASSERT (fs_device != NULL);
+    ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
 
-  struct cache_block* cb = get_cache_block(fs_device, sector_idx, true);
-  lock_acquire(&cb->cache_lock);
+    bool read_flag = op == READ || (op == WRITE && !(offset == 0 && chunk_size >= BLOCK_SECTOR_SIZE));
+    struct cache_block* cb = get_cache_block(fs_device, sector_idx, read_flag);
+    lock_acquire(&cb->cache_lock);
 
-  memcpy(buffer, &(cb->data[offset]), chunk_size);
+    if (op == READ) 
+    {
+        memcpy(buffer, &(cb->data[offset]), chunk_size);
+    }
+    else if (op == WRITE) 
+    {
+        memcpy(&(cb->data[offset]), buffer, chunk_size);
+        cb->dirty = true;
+    }
 
-  lock_release(&cb->cache_lock);
+    lock_release(&cb->cache_lock);
 }
 
-void
-cache_write (struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size)
+void cache_read(struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size)
 {
-  ASSERT (fs_device != NULL);
-  ASSERT (offset >= 0 && chunk_size >= 0 && (offset + chunk_size) <= BLOCK_SECTOR_SIZE);
-
-  struct cache_block* cb;
-  if (offset == 0 && chunk_size >= BLOCK_SECTOR_SIZE)
-    cb = get_cache_block (fs_device, sector_idx, false);
-  else
-    cb = get_cache_block (fs_device, sector_idx, true);
-  lock_acquire(&cb->cache_lock);
-
-  memcpy(&(cb->data[offset]), buffer, chunk_size);
-  cb->dirty = true;
-
-  lock_release(&cb->cache_lock);
-
+    cache_operation(READ, fs_device, sector_idx, buffer, offset, chunk_size);
 }
+
+void cache_write(struct block *fs_device, block_sector_t sector_idx, void *buffer, off_t offset, int chunk_size)
+{
+    cache_operation(WRITE, fs_device, sector_idx, buffer, offset, chunk_size);
+}
+
 
 void
 cache_shutdown (struct block *fs_device)
