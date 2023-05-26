@@ -336,22 +336,22 @@ syscall_handler (struct intr_frame *f UNUSED)
 }
 
 
+static block_sector_t get_inode_inumber(int fid)
+{
+  struct file *file = (get_fd_by_num(fid))->file;
+  if (file != NULL) 
+  {
+    return inode_get_inumber(file_get_inode(file));
+  }
+  else 
+  {
+    return -1;
+  }
+}
 
 void sys_inumber (struct intr_frame *f, int fid)
 {
-
-   struct file_descriptor *descriptor = get_fd_by_num(fid);
-  if (descriptor != NULL) {
-    struct file *file = descriptor->file;
-    if ((block_sector_t) inode_get_inumber (file_get_inode (file)) ) {
-    f->eax = file;
-  } else {
-    f->eax = -1;
-  }
-  } else {
-    f->eax = -1;
-  }
-
+  f->eax = get_inode_inumber(fid);
 }
 
 
