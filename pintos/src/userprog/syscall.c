@@ -99,28 +99,17 @@ sys_open (const char *name)
     new_fd->fd = fd_num ;
     cur->fd_count += 1;
     list_push_back(&cur->fd_list, &new_fd->elem);
+
     struct inode *inode = file_get_inode (f);
     if (inode && is_directory_inode (inode))
-      (get_fd_by_num(fd_num))->dir = dir_open (inode_reopen (inode));
+    { (get_fd_by_num(fd_num))->dir = dir_open (inode_reopen (inode));
+    }
+      
     return fd_num; 
   }
 }
 
-// int
-// sys_close (int fdnum) 
-// {
-//   if (fdnum <= STDOUT_FILENO)
-//     sys_exit(-1);
-//   struct file_descriptor *fd = get_fd_by_num(fdnum);
-//   if (!fd)
-//     return -1;
-//   file_close (fd->file);
-//   if (fd->dir) 
-//   dir_close (fd->dir);
-//   list_remove (&fd->elem);
-//   free(fd);
-//   return 0;
-// }
+
 
 int
 sys_close (int fdnum) 
@@ -319,7 +308,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     sys_readdir(f, args[1], (char *) args[2]);
   } else if ( args[0] == SYS_CHDIR){
     sys_chdir(f, (char *) args[1]);
-  } else if ( SYS_INUMBER) {
+  } else if (args[0] == SYS_INUMBER) {
     sys_inumber(f, args[1] );
   } else if (args[0] == SYS_CACHE_SPOIL) {
     cache_spoil_syscall();
@@ -335,10 +324,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 }
 
-
 static block_sector_t get_inode_inumber(int fid)
 {
-  struct file *file = (get_fd_by_num(fid))->file;
+  struct file_descriptor *fds = get_fd_by_num(fid);
+  struct file *file = fds->file;
   if (file != NULL) 
   {
     return inode_get_inumber(file_get_inode(file));
@@ -353,9 +342,6 @@ void sys_inumber (struct intr_frame *f, int fid)
 {
   f->eax = get_inode_inumber(fid);
 }
-
-
-
 
 void
   sys_isdir (struct intr_frame *f, int fid) {
@@ -373,7 +359,6 @@ void
     f->eax = -1;
   }
 }
-
 
 struct 
 dir* open_valid_directory(char *dir_name, struct intr_frame *f) {

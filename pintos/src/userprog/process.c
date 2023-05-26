@@ -48,10 +48,10 @@ process_execute (const char *file_name)
   tid_t tid;
 
   struct process_status *ps = malloc (sizeof (struct process_status));
-  sema_init(&ps->ws, 0);
-  lock_init(&ps->rc_lock);
-  ps->rc = 2;
   ps->is_exited = false;
+  sema_init (&ps->ws, 0);
+  ps->rc = 2;
+  lock_init (&ps->rc_lock);
 
   struct thread *t = thread_current();
   list_push_back (&(t->children), &ps->elem);
@@ -72,13 +72,16 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, c_args);
   if (tid == TID_ERROR){
-    free_on_error(ps, fn_copy);
+    // free_on_error(ps, fn_copy);
+    	palloc_free_page (fn_copy);
+      free (ps);
     return TID_ERROR;
   }
 
   sema_down(&ps->ws);
 
-  if (ps->exit_code != 0 && ps->is_exited){
+
+  if (ps->is_exited && ps->exit_code == -1)  {
     list_remove(&ps->elem);
     free(ps);
     return -1;
@@ -145,6 +148,9 @@ start_process (struct cArgs *c_args)
   t->ps->pid = t->tid;
   list_init(&t->children);
   init_cur_dir(t, c_args);
+
+  t->working_dir = c_args->cur_dir? dir_reopen (c_args->cur_dir) : dir_open_root ();
+
 
   free(c_args);
 
